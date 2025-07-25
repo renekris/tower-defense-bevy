@@ -5,6 +5,9 @@ pub mod collision_system;
 pub mod combat_system;
 pub mod ui_system;
 pub mod input_system;
+pub mod path_generation;
+pub mod debug_visualization;
+pub mod debug_ui;
 
 pub use tower_system::*;
 pub use enemy_system::*;
@@ -13,3 +16,6 @@ pub use collision_system::*;
 pub use combat_system::*;
 pub use ui_system::*;
 pub use input_system::*;
+pub use path_generation::*;
+pub use debug_visualization::*;
+pub use debug_ui::*;

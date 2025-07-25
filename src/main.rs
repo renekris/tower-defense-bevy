@@ -9,6 +9,8 @@ use systems::enemy_system::*;
 use systems::input_system::*;
 use systems::ui_system::*;
 use systems::combat_system::*;
+use systems::debug_visualization::*;
+use systems::debug_ui::*;
 
 fn main() {
     App::new()
@@ -21,6 +23,8 @@ fn main() {
             }),
             ..default()
         }))
+        // Add custom plugins
+        .add_plugins(DebugUIPlugin)
         // Initialize game resources
         .init_resource::<Score>()
         .init_resource::<WaveManager>()
@@ -28,6 +32,7 @@ fn main() {
         .init_resource::<Economy>()
         .init_resource::<MouseInputState>()
         .init_resource::<WaveStatus>()
+        .init_resource::<DebugVisualizationState>()
         .insert_resource(create_default_path())
         // Setup systems
         .add_systems(Startup, (setup, setup_placement_zones))
@@ -38,6 +43,10 @@ fn main() {
             tower_placement_system,
             tower_placement_preview_system,
             update_ui_system,
+            
+            // Debug visualization systems
+            debug_toggle_system,
+            debug_visualization_system,
             
             // Combat systems (ORDER CRITICAL - dependency chain)
             tower_targeting_system,
@@ -64,14 +73,14 @@ fn setup(mut commands: Commands) {
     
     commands.spawn(Text2dBundle {
         text: Text::from_section(
-            "Tower Defense Game - Phase 3 COMBAT!\nSPACE: spawn wave | ESC: exit\n1-5: select tower type | LEFT CLICK: place tower\nTowers auto-target and shoot enemies! Defend the base!",
+            "Tower Defense Game - Phase 3 COMBAT!\nSPACE: spawn wave | ESC: exit\n1-5: select tower type | LEFT CLICK: place tower\nF1: toggle debug visualization | F2: debug UI panel | 1-9: select wave (debug mode)\nTowers auto-target and shoot enemies! Defend the base!",
             TextStyle {
-                font_size: 22.0,
+                font_size: 20.0,
                 color: Color::srgb(1.0, 1.0, 1.0),
                 ..default()
             },
         ),
-        transform: Transform::from_translation(Vec3::new(0.0, 320.0, 0.0)),
+        transform: Transform::from_translation(Vec3::new(0.0, 330.0, 0.0)),
         ..default()
     });
 
