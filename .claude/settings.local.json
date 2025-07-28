@@ -1,0 +1,14 @@
+{
+  "permissions": {
+    "allow": [
+      "mcp__sequentialthinking__sequentialthinking",
+      "Bash(cargo test:*)",
+      "Bash(cargo run:*)",
+      "mcp__memory__create_entities",
+      "Bash(git add:*)",
+      "Bash(cargo clippy:*)"
+    ],
+    "deny": [],
+    "ask": []
+  }
+}
