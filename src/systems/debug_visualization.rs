@@ -98,6 +98,7 @@ pub fn debug_toggle_system(
 pub fn debug_visualization_system(
     mut commands: Commands,
     debug_state: Res<DebugVisualizationState>,
+    ui_state: Res<crate::systems::debug_ui::DebugUIState>,
     debug_entities: Query<Entity, With<DebugVisualization>>,
 ) {
     // Clean up existing debug entities when state changes
@@ -112,14 +113,13 @@ pub fn debug_visualization_system(
         return;
     }
     
-    // Generate the current path and grid for visualization
-    let enemy_path = generate_level_path(debug_state.current_wave);
+    // Generate the current path and grid for visualization using UI parameters
+    let enemy_path = generate_level_path_with_params(debug_state.current_wave, ui_state.current_obstacle_density);
     let tower_zones = generate_placement_zones(debug_state.current_wave);
     
-    // Generate the procedural map to get the grid data
-    let difficulty = (debug_state.current_wave as f32 * 0.15).min(1.0);
+    // Generate the procedural map to get the grid data with UI obstacle density
     let seed = debug_state.current_wave as u64 * 12345 + 67890;
-    let grid = generate_procedural_map(seed, difficulty);
+    let grid = generate_procedural_map_with_density(seed, ui_state.current_obstacle_density);
     
     // Render grid cells
     if debug_state.show_grid || debug_state.show_obstacles {

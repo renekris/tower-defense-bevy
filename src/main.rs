@@ -10,6 +10,7 @@ use systems::input_system::*;
 use systems::ui_system::*;
 use systems::combat_system::*;
 use systems::debug_visualization::*;
+use systems::debug_ui::GamePathLine;
 use systems::debug_ui::*;
 
 fn main() {
@@ -92,15 +93,18 @@ fn setup(mut commands: Commands) {
         let midpoint = (start + end) / 2.0;
         let length = start.distance(end);
         
-        commands.spawn(SpriteBundle {
-            sprite: Sprite {
-                color: Color::srgb(0.5, 0.5, 0.5),
-                custom_size: Some(Vec2::new(length, 5.0)),
+        commands.spawn((
+            SpriteBundle {
+                sprite: Sprite {
+                    color: Color::srgb(0.5, 0.5, 0.5),
+                    custom_size: Some(Vec2::new(length, 5.0)),
+                    ..default()
+                },
+                transform: Transform::from_translation(midpoint.extend(-1.0)),
                 ..default()
             },
-            transform: Transform::from_translation(midpoint.extend(-1.0)),
-            ..default()
-        });
+            GamePathLine,
+        ));
     }
 }
 
