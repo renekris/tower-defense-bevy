@@ -236,7 +236,7 @@ impl TowerStats {
 
     pub fn get_upgrade_cost(&self) -> ResourceCost {
         let base_cost = self.tower_type.get_cost();
-        let multiplier = self.upgrade_level as u32;
+        let multiplier = self.upgrade_level;
         
         ResourceCost::new(
             base_cost.money * multiplier / 2,
@@ -244,6 +244,66 @@ impl TowerStats {
             base_cost.materials * multiplier / 4,
             base_cost.energy * multiplier / 2,
         )
+    }
+
+    pub fn can_upgrade(&self) -> bool {
+        self.upgrade_level < 5
+    }
+
+    pub fn upgrade(&mut self) {
+        if !self.can_upgrade() {
+            return;
+        }
+
+        self.upgrade_level += 1;
+        self.apply_upgrade_stats();
+    }
+
+    fn apply_upgrade_stats(&mut self) {
+        // Calculate base stats for level 1
+        let (base_damage, base_range, base_fire_rate) = match self.tower_type {
+            TowerType::Basic => (15.0, 80.0, 1.0),
+            TowerType::Advanced => (25.0, 100.0, 1.2),
+            TowerType::Laser => (20.0, 120.0, 2.0),
+            TowerType::Missile => (40.0, 90.0, 0.5),
+            TowerType::Tesla => (18.0, 70.0, 0.8),
+        };
+
+        // Apply level-based multipliers with tower-specific specializations
+        let level_multiplier = self.upgrade_level as f32;
+        
+        match self.tower_type {
+            TowerType::Basic => {
+                // Balanced upgrade across all stats
+                self.damage = base_damage * (1.0 + (level_multiplier - 1.0) * 0.25);
+                self.range = base_range * (1.0 + (level_multiplier - 1.0) * 0.15);
+                self.fire_rate = base_fire_rate * (1.0 + (level_multiplier - 1.0) * 0.20);
+            },
+            TowerType::Advanced => {
+                // Focus on damage improvement
+                self.damage = base_damage * (1.0 + (level_multiplier - 1.0) * 0.35);
+                self.range = base_range * (1.0 + (level_multiplier - 1.0) * 0.12);
+                self.fire_rate = base_fire_rate * (1.0 + (level_multiplier - 1.0) * 0.15);
+            },
+            TowerType::Laser => {
+                // Focus on fire rate (high accuracy, rapid fire)
+                self.damage = base_damage * (1.0 + (level_multiplier - 1.0) * 0.20);
+                self.range = base_range * (1.0 + (level_multiplier - 1.0) * 0.10);
+                self.fire_rate = base_fire_rate * (1.0 + (level_multiplier - 1.0) * 0.40);
+            },
+            TowerType::Missile => {
+                // Focus on damage (area damage, explosive)
+                self.damage = base_damage * (1.0 + (level_multiplier - 1.0) * 0.45);
+                self.range = base_range * (1.0 + (level_multiplier - 1.0) * 0.10);
+                self.fire_rate = base_fire_rate * (1.0 + (level_multiplier - 1.0) * 0.10);
+            },
+            TowerType::Tesla => {
+                // Focus on range (chain lightning, area coverage)
+                self.damage = base_damage * (1.0 + (level_multiplier - 1.0) * 0.25);
+                self.range = base_range * (1.0 + (level_multiplier - 1.0) * 0.30);
+                self.fire_rate = base_fire_rate * (1.0 + (level_multiplier - 1.0) * 0.15);
+            },
+        }
     }
 }
 

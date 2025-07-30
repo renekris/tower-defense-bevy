@@ -27,9 +27,9 @@ fn test_grid_coordinate_conversion() {
     let center_grid = GridPos::new(10, 6);
     let center_world = grid.grid_to_world(center_grid);
     
-    // Should be approximately at world origin
-    assert!((center_world.x).abs() < 32.0, "Center X should be near 0, got {}", center_world.x);
-    assert!((center_world.y).abs() < 32.0, "Center Y should be near 0, got {}", center_world.y);
+    // For a 20x12 grid with 64.0 cell size, center should be at (32, 32)
+    assert!((center_world.x - 32.0).abs() < 1.0, "Center X should be near 32, got {}", center_world.x);
+    assert!((center_world.y - 32.0).abs() < 1.0, "Center Y should be near 32, got {}", center_world.y);
     
     // Test round-trip conversion
     if let Some(converted_back) = grid.world_to_grid(center_world) {

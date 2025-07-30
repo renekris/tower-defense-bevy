@@ -24,7 +24,7 @@ pub fn generate_procedural_map(seed: u64, difficulty: f32) -> PathGrid {
     
     // Ensure path exists - if not, reduce obstacles and try again
     let mut attempts = 0;
-    while !crate::systems::path_generation::find_path(&grid, grid.entry_point, grid.exit_point).is_some() && attempts < 10 {
+    while crate::systems::path_generation::find_path(&grid, grid.entry_point, grid.exit_point).is_none() && attempts < 10 {
         reduce_obstacles(&mut grid, &mut rng, 0.1);
         attempts += 1;
     }
@@ -54,7 +54,7 @@ pub fn generate_procedural_map_with_density(seed: u64, obstacle_density: f32) ->
     
     // Ensure path exists - if not, reduce obstacles and try again
     let mut attempts = 0;
-    while !crate::systems::path_generation::find_path(&grid, grid.entry_point, grid.exit_point).is_some() && attempts < 10 {
+    while crate::systems::path_generation::find_path(&grid, grid.entry_point, grid.exit_point).is_none() && attempts < 10 {
         reduce_obstacles(&mut grid, &mut rng, 0.1);
         attempts += 1;
     }
@@ -153,7 +153,7 @@ pub fn enhance_chokepoints(grid: &mut PathGrid, path: &[GridPos]) {
 }
 
 /// Mark an area around a chokepoint as strategically valuable
-fn mark_strategic_area(grid: &mut PathGrid, center: GridPos) {
+fn mark_strategic_area(_grid: &mut PathGrid, _center: GridPos) {
     // This could be used for tower zone optimization
     // For now, just a placeholder that could store strategic values
     let _strategic_radius = 2;
@@ -189,7 +189,7 @@ pub fn calculate_strategic_value(grid: &PathGrid, pos: GridPos, path: &[GridPos]
 }
 
 /// Calculate how much of the path this position can "see" or cover
-fn calculate_path_coverage(grid: &PathGrid, pos: GridPos, path: &[GridPos]) -> f32 {
+fn calculate_path_coverage(_grid: &PathGrid, pos: GridPos, path: &[GridPos]) -> f32 {
     let max_range = 4.0; // Typical tower range in grid cells
     
     let covered_path_segments = path.iter()
