@@ -68,7 +68,7 @@ fn test_mouse_input_state_creation() {
     assert_eq!(mouse_state.world_position, Vec2::ZERO);
     assert!(!mouse_state.left_clicked);
     assert!(!mouse_state.right_clicked);
-    assert_eq!(mouse_state.selected_tower_type, None);
+    assert_eq!(mouse_state.placement_mode, PlacementMode::Hybrid);
 }
 
 #[test]

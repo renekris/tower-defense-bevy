@@ -8,6 +8,7 @@ pub mod input_system;
 pub mod path_generation;
 pub mod debug_visualization;
 pub mod debug_ui;
+pub mod tower_ui;
 
 pub use tower_system::*;
 pub use enemy_system::*;
@@ -19,3 +20,4 @@ pub use input_system::*;
 pub use path_generation::*;
 pub use debug_visualization::*;
 pub use debug_ui::*;
+pub use tower_ui::*;

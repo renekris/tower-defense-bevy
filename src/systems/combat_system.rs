@@ -159,6 +159,8 @@ pub fn collision_system(
     mut commands: Commands,
     mut economy: ResMut<Economy>,
     mut wave_status: ResMut<WaveStatus>,
+    debug_ui_state: Option<Res<crate::systems::debug_ui::DebugUIState>>,
+    debug_state: Option<Res<crate::systems::debug_visualization::DebugVisualizationState>>,
     projectiles: Query<(Entity, &Transform, &Projectile)>,
     mut enemies: Query<(Entity, &Transform, &mut Health), With<Enemy>>,
 ) {
@@ -169,8 +171,27 @@ pub fn collision_system(
                 .distance(enemy_transform.translation.truncate());
             
             if distance < 16.0 { // Collision threshold
+                // Calculate effective damage with UI multiplier
+                let damage_multiplier = if let (Some(ui_state), Some(debug_state)) = (&debug_ui_state, &debug_state) {
+                    if debug_state.enabled {
+                        ui_state.tower_damage_multiplier
+                    } else {
+                        1.0
+                    }
+                } else {
+                    1.0
+                };
+                
+                let effective_damage = projectile_data.damage * damage_multiplier;
+                
+                // Debug output for damage multiplier (only when different from 1.0)
+                if damage_multiplier != 1.0 {
+                    println!("Applied damage multiplier {:.2}: {:.1} -> {:.1} damage", 
+                        damage_multiplier, projectile_data.damage, effective_damage);
+                }
+                
                 // Apply damage to enemy
-                enemy_health.take_damage(projectile_data.damage);
+                enemy_health.take_damage(effective_damage);
                 
                 // Remove projectile (it hit something)
                 commands.entity(projectile_entity).despawn();

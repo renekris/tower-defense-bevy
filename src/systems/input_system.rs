@@ -4,6 +4,7 @@ use bevy::window::PrimaryWindow;
 use crate::resources::*;
 use crate::components::*;
 use crate::systems::combat_system::Target;
+use crate::systems::tower_ui::TowerSelectionState;
 
 #[derive(Resource, Debug)]
 pub struct MouseInputState {
@@ -11,7 +12,6 @@ pub struct MouseInputState {
     pub world_position: Vec2,
     pub left_clicked: bool,
     pub right_clicked: bool,
-    pub selected_tower_type: Option<TowerType>,
     pub placement_mode: PlacementMode,
     pub preview_position: Option<Vec2>,
 }
@@ -23,7 +23,6 @@ impl Default for MouseInputState {
             world_position: Vec2::ZERO,
             left_clicked: false,
             right_clicked: false,
-            selected_tower_type: None,
             placement_mode: PlacementMode::Hybrid,
             preview_position: None,
         }
@@ -93,57 +92,44 @@ pub fn mouse_input_system(
     }
 }
 
-// Tower placement system
+// Tower placement system - now uses UI-controlled selection
 pub fn tower_placement_system(
     mut commands: Commands,
-    mut mouse_state: ResMut<MouseInputState>,
+    mouse_state: Res<MouseInputState>,
+    tower_selection_state: Res<TowerSelectionState>,
     mut economy: ResMut<Economy>,
-    keyboard_input: Res<ButtonInput<KeyCode>>,
     existing_towers: Query<&Transform, With<TowerStats>>,
     enemy_path: Res<EnemyPath>,
 ) {
-    // Tower type selection with number keys - UPDATE THE RESOURCE
-    if keyboard_input.just_pressed(KeyCode::Digit1) {
-        mouse_state.selected_tower_type = Some(TowerType::Basic);
-        println!("Selected Basic Tower");
-    } else if keyboard_input.just_pressed(KeyCode::Digit2) {
-        mouse_state.selected_tower_type = Some(TowerType::Advanced);
-        println!("Selected Advanced Tower");
-    } else if keyboard_input.just_pressed(KeyCode::Digit3) {
-        mouse_state.selected_tower_type = Some(TowerType::Laser);
-        println!("Selected Laser Tower");
-    } else if keyboard_input.just_pressed(KeyCode::Digit4) {
-        mouse_state.selected_tower_type = Some(TowerType::Missile);
-        println!("Selected Missile Tower");
-    } else if keyboard_input.just_pressed(KeyCode::Digit5) {
-        mouse_state.selected_tower_type = Some(TowerType::Tesla);
-        println!("Selected Tesla Tower");
-    } else if keyboard_input.just_pressed(KeyCode::Escape) {
-        mouse_state.selected_tower_type = None;
-        println!("Cleared tower selection");
-    }
-
     // Only attempt placement if we have a tower type selected and left click
-    if let Some(tower_type) = mouse_state.selected_tower_type {
-        if mouse_state.left_clicked {
-            println!("Attempting to place {:?} at {:?}", tower_type, mouse_state.world_position);
-            let placement_pos = get_placement_position(
-                mouse_state.world_position,
-                mouse_state.placement_mode,
-            );
+    // AND we're in placement mode (not upgrade mode)
+    if tower_selection_state.is_placement_mode() {
+        if let Some(tower_type) = tower_selection_state.selected_placement_type {
+            if mouse_state.left_clicked {
+                println!("Attempting to place {:?} at {:?}", tower_type, mouse_state.world_position);
+                let placement_pos = get_placement_position(
+                    mouse_state.world_position,
+                    mouse_state.placement_mode,
+                );
 
-            // Validate placement
-            if is_valid_tower_placement(
-                placement_pos,
-                &existing_towers,
-                &enemy_path.waypoints,
-                32.0, // Tower size
-            ) {
-                let cost = tower_type.get_cost();
-                if economy.can_afford(&cost) {
-                    // Place the tower
-                    spawn_tower(&mut commands, placement_pos, tower_type);
-                    economy.spend(&cost);
+                // Validate placement
+                if is_valid_tower_placement(
+                    placement_pos,
+                    &existing_towers,
+                    &enemy_path.waypoints,
+                    32.0, // Tower size
+                ) {
+                    let cost = tower_type.get_cost();
+                    if economy.can_afford(&cost) {
+                        // Place the tower
+                        spawn_tower(&mut commands, placement_pos, tower_type);
+                        economy.spend(&cost);
+                        println!("Placed {:?} tower at {:?}", tower_type, placement_pos);
+                    } else {
+                        println!("Cannot afford {:?} tower", tower_type);
+                    }
+                } else {
+                    println!("Invalid tower placement position");
                 }
             }
         }
@@ -154,6 +140,7 @@ pub fn tower_placement_system(
 pub fn tower_placement_preview_system(
     mut commands: Commands,
     mouse_state: Res<MouseInputState>,
+    tower_selection_state: Res<TowerSelectionState>,
     existing_previews: Query<Entity, With<PlacementPreview>>,
     economy: Res<Economy>,
     existing_towers: Query<&Transform, With<TowerStats>>,
@@ -164,44 +151,46 @@ pub fn tower_placement_preview_system(
         commands.entity(entity).despawn();
     }
 
-    // Show preview if tower type is selected
-    if let Some(tower_type) = mouse_state.selected_tower_type {
-        let placement_pos = get_placement_position(
-            mouse_state.world_position,
-            mouse_state.placement_mode,
-        );
+    // Show preview if tower type is selected and we're in placement mode
+    if tower_selection_state.is_placement_mode() {
+        if let Some(tower_type) = tower_selection_state.selected_placement_type {
+            let placement_pos = get_placement_position(
+                mouse_state.world_position,
+                mouse_state.placement_mode,
+            );
 
-        let is_valid = is_valid_tower_placement(
-            placement_pos,
-            &existing_towers,
-            &enemy_path.waypoints,
-            32.0,
-        );
+            let is_valid = is_valid_tower_placement(
+                placement_pos,
+                &existing_towers,
+                &enemy_path.waypoints,
+                32.0,
+            );
 
-        let cost = tower_type.get_cost();
-        let can_afford = economy.can_afford(&cost);
-        let color = if is_valid && can_afford {
-            Color::srgba(0.0, 1.0, 0.0, 0.5) // Green
-        } else {
-            Color::srgba(1.0, 0.0, 0.0, 0.5) // Red
-        };
+            let cost = tower_type.get_cost();
+            let can_afford = economy.can_afford(&cost);
+            let color = if is_valid && can_afford {
+                Color::srgba(0.0, 1.0, 0.0, 0.5) // Green
+            } else {
+                Color::srgba(1.0, 0.0, 0.0, 0.5) // Red
+            };
 
-        // Spawn preview sprite
-        commands.spawn((
-            SpriteBundle {
-                sprite: Sprite {
-                    color,
-                    custom_size: Some(Vec2::new(32.0, 32.0)),
+            // Spawn preview sprite
+            commands.spawn((
+                SpriteBundle {
+                    sprite: Sprite {
+                        color,
+                        custom_size: Some(Vec2::new(32.0, 32.0)),
+                        ..default()
+                    },
+                    transform: Transform::from_translation(placement_pos.extend(1.0)),
                     ..default()
                 },
-                transform: Transform::from_translation(placement_pos.extend(1.0)),
-                ..default()
-            },
-            PlacementPreview,
-        ));
+                PlacementPreview,
+            ));
 
-        // Show range indicator
-        spawn_range_preview(&mut commands, placement_pos, tower_type);
+            // Show range indicator
+            spawn_range_preview(&mut commands, placement_pos, tower_type);
+        }
     }
 }
 
@@ -221,9 +210,7 @@ pub fn screen_to_world_position(
     let ndc = Vec2::new(ndc.x, -ndc.y);
     
     // Apply camera transform
-    let world_pos = camera_transform.translation().truncate() + ndc * window_size * 0.5;
-    
-    world_pos
+    camera_transform.translation().truncate() + ndc * window_size * 0.5
 }
 
 pub fn snap_to_grid(position: Vec2, grid_size: f32) -> Vec2 {
@@ -240,10 +227,8 @@ pub fn get_placement_position(world_pos: Vec2, mode: PlacementMode) -> Vec2 {
         PlacementMode::Hybrid => {
             if is_in_grid_zone(world_pos) {
                 snap_to_grid(world_pos, 64.0)
-            } else if is_in_free_zone(world_pos) {
-                world_pos
             } else {
-                world_pos // Fallback
+                world_pos // Free zone or fallback
             }
         }
         PlacementMode::None => world_pos,

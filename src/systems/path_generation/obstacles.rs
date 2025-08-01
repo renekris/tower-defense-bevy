@@ -24,7 +24,37 @@ pub fn generate_procedural_map(seed: u64, difficulty: f32) -> PathGrid {
     
     // Ensure path exists - if not, reduce obstacles and try again
     let mut attempts = 0;
-    while !crate::systems::path_generation::find_path(&grid, grid.entry_point, grid.exit_point).is_some() && attempts < 10 {
+    while crate::systems::path_generation::find_path(&grid, grid.entry_point, grid.exit_point).is_none() && attempts < 10 {
+        reduce_obstacles(&mut grid, &mut rng, 0.1);
+        attempts += 1;
+    }
+    
+    grid
+}
+
+/// Generate a procedural map with custom obstacle density
+/// 
+/// # Arguments
+/// * `seed` - Random seed for reproducible generation
+/// * `obstacle_density` - Direct obstacle density override (0.0-0.5)
+/// 
+/// # Returns
+/// * `PathGrid` - Generated map with obstacles and entry/exit points
+pub fn generate_procedural_map_with_density(seed: u64, obstacle_density: f32) -> PathGrid {
+    let mut rng = StdRng::seed_from_u64(seed);
+    let mut grid = PathGrid::new(20, 12);
+    
+    // Set entry and exit points (avoid corners)
+    grid.entry_point = GridPos::new(0, rng.random_range(2..10));
+    grid.exit_point = GridPos::new(19, rng.random_range(2..10));
+    
+    // Place strategic obstacles with custom density
+    let clamped_density = obstacle_density.clamp(0.0, 0.5); // Max 50% coverage
+    place_strategic_obstacles(&mut grid, &mut rng, clamped_density);
+    
+    // Ensure path exists - if not, reduce obstacles and try again
+    let mut attempts = 0;
+    while crate::systems::path_generation::find_path(&grid, grid.entry_point, grid.exit_point).is_none() && attempts < 10 {
         reduce_obstacles(&mut grid, &mut rng, 0.1);
         attempts += 1;
     }
@@ -123,7 +153,7 @@ pub fn enhance_chokepoints(grid: &mut PathGrid, path: &[GridPos]) {
 }
 
 /// Mark an area around a chokepoint as strategically valuable
-fn mark_strategic_area(grid: &mut PathGrid, center: GridPos) {
+fn mark_strategic_area(_grid: &mut PathGrid, _center: GridPos) {
     // This could be used for tower zone optimization
     // For now, just a placeholder that could store strategic values
     let _strategic_radius = 2;
@@ -159,7 +189,7 @@ pub fn calculate_strategic_value(grid: &PathGrid, pos: GridPos, path: &[GridPos]
 }
 
 /// Calculate how much of the path this position can "see" or cover
-fn calculate_path_coverage(grid: &PathGrid, pos: GridPos, path: &[GridPos]) -> f32 {
+fn calculate_path_coverage(_grid: &PathGrid, pos: GridPos, path: &[GridPos]) -> f32 {
     let max_range = 4.0; // Typical tower range in grid cells
     
     let covered_path_segments = path.iter()
