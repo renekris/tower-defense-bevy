@@ -34,6 +34,9 @@ fn main() {
             }),
             ..default()
         }))
+        // TODO: Add Remote Protocol plugin for MCP server integration when upgrading to Bevy 0.15+
+        // .add_plugins(bevy::remote::RemotePlugin::default())
+        // .add_plugins(BrpExtrasPlugin)
         // Add custom plugins
         .add_plugins(DebugUIPlugin)
         // Initialize game resources
