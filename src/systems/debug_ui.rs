@@ -1,4 +1,5 @@
 use bevy::prelude::*;
+use bevy::ui::*;
 use crate::components::*;
 use crate::resources::*;
 use crate::systems::debug_visualization::DebugVisualizationState;
@@ -13,20 +14,18 @@ impl Plugin for DebugUIPlugin {
             .init_resource::<SliderDragState>()
             .init_resource::<PerformanceMetrics>()
             .add_systems(Startup, setup_debug_ui)
-            // TODO: Fix type alias issues with complex function signatures
-            // .add_systems(Update, debug_ui_toggle_system)
-            // .add_systems(Update, update_debug_ui_visibility)
-            // .add_systems(Update, handle_toggle_button_interactions)
-            // .add_systems(Update, handle_slider_interactions)
-            // .add_systems(Update, handle_action_buttons)
-            // .add_systems(Update, handle_debug_keyboard_shortcuts)
-            // .add_systems(Update, update_slider_values)
-            // .add_systems(Update, update_enemy_path_from_ui)
-            // .add_systems(Update, update_spawn_rate_from_ui)
-            // .add_systems(Update, update_performance_metrics)
-            // .add_systems(Update, update_performance_display)
-            // .add_systems(Update, sync_ui_with_debug_state);
-            ;
+            .add_systems(Update, debug_ui_toggle_system)
+            .add_systems(Update, update_debug_ui_visibility)
+            .add_systems(Update, handle_toggle_button_interactions)
+            .add_systems(Update, handle_slider_interactions)
+            .add_systems(Update, handle_action_buttons)
+            .add_systems(Update, handle_debug_keyboard_shortcuts)
+            .add_systems(Update, update_slider_values)
+            .add_systems(Update, update_enemy_path_from_ui)
+            .add_systems(Update, update_spawn_rate_from_ui)
+            .add_systems(Update, update_performance_metrics)
+            .add_systems(Update, update_performance_display)
+            .add_systems(Update, sync_ui_with_debug_state);
     }
 }
 
@@ -137,11 +136,11 @@ pub fn debug_ui_toggle_system(
 /// System to update UI panel visibility based on state
 pub fn update_debug_ui_visibility(
     ui_state: Res<DebugUIState>,
-    mut panel_query: Query<&mut Style, With<DebugUIPanel>>,
+    mut panel_query: Query<&mut Node, With<DebugUIPanel>>,
 ) {
     if ui_state.is_changed() {
-        for mut style in &mut panel_query {
-            style.display = if ui_state.panel_visible {
+        for mut node in &mut panel_query {
+            node.display = if ui_state.panel_visible {
                 Display::Flex
             } else {
                 Display::None
@@ -152,60 +151,41 @@ pub fn update_debug_ui_visibility(
 
 /// Setup the debug UI panel structure
 pub fn setup_debug_ui(mut commands: Commands) {
-    // Main debug panel container - positioned on the right side
-    commands
+    println!("DEBUG: Creating simple test debug UI panel");
+    
+    // Create a simple test panel first to verify basic functionality
+    let panel_entity = commands
         .spawn((
-            Node::default(),
-            Style {
+            Node {
                 position_type: PositionType::Absolute,
-                right: Val::Px(0.0),
-                top: Val::Px(0.0),
-                width: Val::Px(300.0),
-                height: Val::Percent(100.0),
+                right: Val::Px(10.0),
+                top: Val::Px(50.0),
+                width: Val::Px(250.0),
+                height: Val::Px(200.0),
                 flex_direction: FlexDirection::Column,
                 padding: UiRect::all(Val::Px(10.0)),
-                display: Display::None, // Hidden by default
+                display: Display::Flex, // Visible by default for testing
                 ..default()
             },
-            BackgroundColor(Color::srgba(0.0, 0.0, 0.0, 0.8)),
-            ZIndex(1000),
+            BackgroundColor(Color::srgba(0.0, 0.0, 0.0, 0.9)),
             DebugUIPanel,
         ))
-        .with_children(|parent| {
-            // Header
-            parent.spawn((
-                Text::new("Debug Controls (F2)"),
-                TextFont {
-                    font_size: 18.0,
-                    ..default()
-                },
-                TextColor(Color::WHITE),
-            ));
-
-            // Spacer
-            parent.spawn((
-                Node::default(),
-                Style {
-                    height: Val::Px(10.0),
-                    ..default()
-                },
-            ));
-
-            // Controls Section
-            create_ui_section(parent, UISectionType::Controls);
-            
-            // Metrics Section
-            create_ui_section(parent, UISectionType::Metrics);
-            
-            // Parameters Section
-            create_ui_section(parent, UISectionType::Parameters);
-            
-            // Actions Section
-            create_ui_section(parent, UISectionType::Actions);
-            
-            // Help Section
-            create_ui_section(parent, UISectionType::Help);
-        });
+        .id();
+        
+    println!("DEBUG: Simple debug panel created with entity ID: {:?}", panel_entity);
+    
+    // Add a simple text child to verify the panel works
+    commands.entity(panel_entity).with_children(|parent| {
+        parent.spawn((
+            Text::new("Debug Panel (F2)\nPress F2 to toggle"),
+            TextFont {
+                font_size: 14.0,
+                ..default()
+            },
+            TextColor(Color::WHITE),
+        ));
+        println!("DEBUG: Added text child to debug panel");
+    });
 }
 
 /// Helper function to create UI sections
@@ -220,8 +200,7 @@ fn create_ui_section(parent: &mut ChildSpawnerCommands, section_type: UISectionT
 
     parent
         .spawn((
-            Node::default(),
-            Style {
+            Node {
                 flex_direction: FlexDirection::Column,
                 margin: UiRect::vertical(Val::Px(5.0)),
                 padding: UiRect::all(Val::Px(5.0)),
@@ -256,8 +235,7 @@ fn create_ui_section(parent: &mut ChildSpawnerCommands, section_type: UISectionT
                     // Create a flex container for the action buttons in a 2x2 grid
                     section
                         .spawn((
-                            Node::default(),
-                            Style {
+                            Node {
                                 display: Display::Flex,
                                 flex_direction: FlexDirection::Row,
                                 flex_wrap: FlexWrap::Wrap,
@@ -290,8 +268,8 @@ fn create_toggle_buttons(parent: &mut ChildSpawnerCommands) {
     for (toggle_type, label) in toggle_types {
         parent
             .spawn((
-                Button::default(),
-                Style {
+                Button,
+                Node {
                     width: Val::Percent(100.0),
                     height: Val::Px(30.0),
                     margin: UiRect::vertical(Val::Px(2.0)),
@@ -403,8 +381,7 @@ fn create_parameter_sliders(parent: &mut ChildSpawnerCommands) {
         // Slider container with label
         parent
             .spawn((
-                Node::default(),
-                Style {
+                Node {
                     flex_direction: FlexDirection::Column,
                     margin: UiRect::vertical(Val::Px(3.0)),
                     ..default()
@@ -435,8 +412,7 @@ fn create_parameter_sliders(parent: &mut ChildSpawnerCommands) {
                 // Slider track and handle container
                 slider_container
                     .spawn((
-                        Node::default(),
-                        Style {
+                        Node {
                             width: Val::Percent(100.0),
                             height: Val::Px(20.0),
                             margin: UiRect::vertical(Val::Px(2.0)),
@@ -450,8 +426,8 @@ fn create_parameter_sliders(parent: &mut ChildSpawnerCommands) {
                         // Slider handle (draggable)
                         let handle_position = ((default_val - min_val) / (max_val - min_val)) * 100.0;
                         track.spawn((
-                            Button::default(),
-                            Style {
+                            Button,
+                            Node {
                                 width: Val::Px(16.0),
                                 height: Val::Px(16.0),
                                 position_type: PositionType::Absolute,
@@ -534,7 +510,7 @@ pub fn handle_slider_interactions(
 
 /// System to handle slider value changes and update UI state
 pub fn update_slider_values(
-    mut slider_query: Query<(&mut ParameterSlider, &mut Style), With<SliderHandle>>,
+    mut slider_query: Query<(&mut ParameterSlider, &mut Node), With<SliderHandle>>,
     mut ui_state: ResMut<DebugUIState>,
     mut text_query: Query<(&SliderValueText, &mut Text)>,
     mouse_input: Res<ButtonInput<MouseButton>>,
@@ -554,7 +530,7 @@ pub fn update_slider_values(
         if let Ok(window) = windows.single() {
             if let Some(mouse_pos) = window.cursor_position() {
                 // Find the dragging slider and update its position
-                for (mut slider, mut style) in &mut slider_query {
+                for (mut slider, mut node) in &mut slider_query {
                     if slider.slider_type == dragging_type {
                         // Simple horizontal drag logic - convert mouse position to slider value
                         // This is a simplified version - in practice you'd need proper track bounds
@@ -579,7 +555,7 @@ pub fn update_slider_values(
                         // Update handle position
                         let handle_pos = ((slider.current_value - slider.min_value) / 
                             (slider.max_value - slider.min_value)) * 100.0;
-                        style.left = Val::Percent(handle_pos - 2.0); // Center the handle
+                        node.left = Val::Percent(handle_pos - 2.0); // Center the handle
                         
                         println!("Slider {:?}: {:.2}", slider.slider_type, slider.current_value);
                         break;
@@ -812,8 +788,8 @@ fn create_action_buttons(parent: &mut ChildSpawnerCommands) {
     for (action_type, label, color) in buttons {
         parent
             .spawn((
-                Button::default(),
-                Style {
+                Button,
+                Node {
                     width: Val::Percent(48.0),
                     height: Val::Px(25.0),
                     margin: UiRect::all(Val::Px(2.0)),
