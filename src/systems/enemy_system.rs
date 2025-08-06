@@ -22,15 +22,12 @@ pub fn enemy_spawning_system(
             Enemy::default(),
             Health::new(50.0),
             PathProgress::new(),
-            SpriteBundle {
-                sprite: Sprite {
-                    color: Color::srgb(1.0, 0.2, 0.2), // Red color for enemies
-                    custom_size: Some(Vec2::new(20.0, 20.0)), // 20x20 pixel square
-                    ..default()
-                },
-                transform: Transform::from_translation(start_pos.extend(1.0)),
+            Sprite {
+                color: Color::srgb(1.0, 0.2, 0.2), // Red color for enemies
+                custom_size: Some(Vec2::new(20.0, 20.0)), // 20x20 pixel square
                 ..default()
             },
+            Transform::from_translation(start_pos.extend(1.0)),
         ));
 
         // Record that we spawned an enemy
@@ -48,7 +45,7 @@ pub fn enemy_movement_system(
 
     for (enemy, mut path_progress, mut transform) in enemy_query.iter_mut() {
         // Calculate how far the enemy should move this frame
-        let distance_this_frame = enemy.speed * time.delta_seconds();
+        let distance_this_frame = enemy.speed * time.delta_secs();
         
         // Convert distance to progress (0.0 to 1.0)
         let progress_this_frame = distance_this_frame / path_length;

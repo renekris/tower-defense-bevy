@@ -12,9 +12,8 @@ name = "tower-defense-bevy"
 path = "src/main.rs"
 
 [dependencies]
-bevy = { version = "0.14", features = ["default"] }
-# TODO: Add BRP support when upgrading to Bevy 0.15+
-# bevy_brp_extras = "0.1"
+bevy = { version = "0.16", features = ["default", "bevy_remote"] }
+bevy_brp_extras = "0.2"
 rand = "0.9.2"
 
 [profile.dev]
