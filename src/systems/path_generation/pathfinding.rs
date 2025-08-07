@@ -41,7 +41,20 @@ impl PartialOrd for PathNode {
 impl Ord for PathNode {
     fn cmp(&self, other: &Self) -> Ordering {
         // Reverse ordering for min-heap behavior
-        other.f_cost.partial_cmp(&self.f_cost).unwrap_or(Ordering::Equal)
+        // HOTFIX: Handle NaN values safely to prevent crashes
+        match other.f_cost.partial_cmp(&self.f_cost) {
+            Some(ord) => ord,
+            None => {
+                // Handle NaN cases: NaN values are considered "worse" than any number
+                if self.f_cost.is_nan() && other.f_cost.is_nan() {
+                    Ordering::Equal
+                } else if self.f_cost.is_nan() {
+                    Ordering::Greater // self is worse
+                } else {
+                    Ordering::Less // other is worse
+                }
+            }
+        }
     }
 }
 

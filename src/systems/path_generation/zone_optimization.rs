@@ -25,7 +25,22 @@ pub fn calculate_optimal_tower_zones(grid: &PathGrid, path: &[GridPos]) -> Vec<T
     ensure_minimum_zones(grid, &mut zones);
     
     // Sort zones by strategic value (highest first)
-    zones.sort_by(|a, b| b.strategic_value.partial_cmp(&a.strategic_value).unwrap());
+    // HOTFIX: Handle NaN values safely to prevent crashes during zone sorting
+    zones.sort_by(|a, b| {
+        match b.strategic_value.partial_cmp(&a.strategic_value) {
+            Some(ord) => ord,
+            None => {
+                // Handle NaN cases: NaN strategic values are considered "worst"
+                if a.strategic_value.is_nan() && b.strategic_value.is_nan() {
+                    std::cmp::Ordering::Equal
+                } else if a.strategic_value.is_nan() {
+                    std::cmp::Ordering::Greater // a is worse
+                } else {
+                    std::cmp::Ordering::Less // b is worse
+                }
+            }
+        }
+    });
     
     zones
 }

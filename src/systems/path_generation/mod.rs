@@ -27,8 +27,15 @@ pub fn generate_level_path(wave_number: u32) -> EnemyPath {
     let grid = generate_procedural_map(seed, difficulty);
     
     // Find optimal path through the generated obstacles
-    let grid_path = find_path(&grid, grid.entry_point, grid.exit_point)
-        .expect("Generated map must have valid path");
+    // HOTFIX: Handle pathfinding failure gracefully instead of crashing
+    let grid_path = match find_path(&grid, grid.entry_point, grid.exit_point) {
+        Some(path) => path,
+        None => {
+            eprintln!("WARNING: Generated map has no valid path! Using fallback straight line.");
+            // Create emergency fallback path (straight line from entry to exit)
+            vec![grid.entry_point, grid.exit_point]
+        }
+    };
     
     // Convert to world coordinates for enemy movement
     grid.to_enemy_path(grid_path)
@@ -49,8 +56,15 @@ pub fn generate_level_path_with_params(wave_number: u32, custom_obstacle_density
     let grid = generate_procedural_map_with_density(seed, custom_obstacle_density);
     
     // Find optimal path through the generated obstacles
-    let grid_path = find_path(&grid, grid.entry_point, grid.exit_point)
-        .expect("Generated map must have valid path");
+    // HOTFIX: Handle pathfinding failure gracefully instead of crashing
+    let grid_path = match find_path(&grid, grid.entry_point, grid.exit_point) {
+        Some(path) => path,
+        None => {
+            eprintln!("WARNING: Generated map has no valid path! Using fallback straight line.");
+            // Create emergency fallback path (straight line from entry to exit)
+            vec![grid.entry_point, grid.exit_point]
+        }
+    };
     
     // Convert to world coordinates for enemy movement
     grid.to_enemy_path(grid_path)
@@ -68,8 +82,14 @@ pub fn generate_placement_zones(wave_number: u32) -> Vec<TowerZone> {
     let seed = wave_number as u64 * 12345 + 67890;
     
     let grid = generate_procedural_map(seed, difficulty);
-    let grid_path = find_path(&grid, grid.entry_point, grid.exit_point)
-        .expect("Generated map must have valid path");
+    let grid_path = match find_path(&grid, grid.entry_point, grid.exit_point) {
+        Some(path) => path,
+        None => {
+            eprintln!("WARNING: Generated map has no valid path in generate_placement_zones! Using fallback straight line.");
+            // Create emergency fallback path (straight line from entry to exit)
+            vec![grid.entry_point, grid.exit_point]
+        }
+    };
     
     let mut zones = calculate_optimal_tower_zones(&grid, &grid_path);
     

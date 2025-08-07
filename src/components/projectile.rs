@@ -22,14 +22,6 @@ impl Projectile {
     }
 }
 
-impl Default for Projectile {
-    fn default() -> Self {
-        Self {
-            damage: 10.0,
-            speed: 200.0,
-            target_entity: Entity::PLACEHOLDER,
-            target_position: Vec2::ZERO,
-            tower_type: TowerType::Basic,
-        }
-    }
-}
+// Removed Default implementation to prevent Entity::PLACEHOLDER usage
+// This forces explicit construction through Projectile::new() which is safer
+// and prevents accidental creation of projectiles with invalid entity references
