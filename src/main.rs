@@ -5,13 +5,15 @@ mod components;
 mod resources;
 mod systems;
 
-use resources::*;
-use systems::enemy_system::*;
-use systems::input_system::*;
-use systems::ui_system::*;
-use systems::combat_system::*;
-use systems::debug_visualization::*;
-use systems::debug_ui::*;
+// Explicit imports to prevent namespace pollution
+use resources::{Economy, GameState, Score, WaveManager, EnemyPath};
+use systems::enemy_system::{enemy_spawning_system, enemy_movement_system, enemy_cleanup_system};
+use systems::input_system::{mouse_input_system, setup_placement_zones, MouseInputState};
+use systems::ui_system::{update_ui_system};
+use systems::combat_system::{tower_targeting_system, projectile_spawning_system, projectile_movement_system, collision_system, game_state_system, WaveStatus};
+use systems::debug_visualization::{DebugVisualizationState, debug_toggle_system, debug_visualization_system};
+use systems::debug_ui::{DebugUIState, debug_ui_toggle_system, setup_debug_ui, DebugUIPlugin};
+use systems::enemy_system::{manual_wave_system};
 use systems::tower_ui::{
     TowerSelectionState, 
     setup_tower_placement_panel, 

@@ -83,7 +83,9 @@ pub fn projectile_spawning_system(
         }
         
         // Check if we have a valid target
+        // HOTFIX: Validate entity exists before accessing to prevent crashes
         if let Some(target_entity) = target.entity {
+            // Double-check the entity still exists before accessing
             if let Ok(target_transform) = enemies.get(target_entity) {
                 // Get projectile properties based on tower type
                 let (projectile_speed, projectile_color) = match stats.tower_type {
@@ -112,6 +114,9 @@ pub fn projectile_spawning_system(
                 ));
                 
                 target.last_shot_time = current_time;
+            } else {
+                // HOTFIX: Target entity no longer exists, clear the stale reference
+                target.entity = None;
             }
         }
     }
@@ -146,6 +151,13 @@ pub fn projectile_movement_system(
         // Remove projectile if it has traveled too far (missed target)
         let travel_distance = current_pos.distance(projectile.target_position);
         if travel_distance > 1000.0 {
+            commands.entity(projectile_entity).despawn();
+        }
+        
+        // HOTFIX: Also remove projectiles that have been alive too long (prevent accumulation)
+        // This prevents runaway projectile entities that could impact performance
+        let projectile_lifetime = current_pos.distance(Vec2::ZERO); // Rough lifetime estimate
+        if projectile_lifetime > 2000.0 { // Maximum projectile range
             commands.entity(projectile_entity).despawn();
         }
     }
