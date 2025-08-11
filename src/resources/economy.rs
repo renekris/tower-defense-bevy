@@ -16,13 +16,13 @@ pub struct Economy {
 impl Default for Economy {
     fn default() -> Self {
         Self {
-            money: 100,
+            money: 50,              // Reduced from 100 - players must be strategic
             research_points: 0,
-            materials: 10,
-            energy: 50,
-            money_generation: 2.0,
-            research_generation: 1.0,
-            energy_generation: 5.0,
+            materials: 5,           // Reduced from 10 - materials should be scarce
+            energy: 30,             // Reduced from 50 - energy management matters
+            money_generation: 0.5,  // Drastically reduced from 2.0 - passive income less dominant
+            research_generation: 0.3, // Reduced from 1.0 - research takes time
+            energy_generation: 2.0,  // Reduced from 5.0 - energy scarcity
         }
     }
 }
@@ -171,11 +171,11 @@ pub enum TowerType {
 impl TowerType {
     pub fn get_cost(&self) -> ResourceCost {
         match self {
-            TowerType::Basic => ResourceCost::money(25),
-            TowerType::Advanced => ResourceCost::new(50, 0, 2, 10),
-            TowerType::Laser => ResourceCost::new(75, 5, 1, 20),
-            TowerType::Missile => ResourceCost::new(100, 3, 4, 15),
-            TowerType::Tesla => ResourceCost::new(120, 10, 3, 30),
+            TowerType::Basic => ResourceCost::money(40),      // Increased from 25
+            TowerType::Advanced => ResourceCost::new(80, 5, 3, 15),  // Increased costs
+            TowerType::Laser => ResourceCost::new(120, 15, 2, 25),   // Increased costs
+            TowerType::Missile => ResourceCost::new(160, 8, 6, 25),  // Increased costs
+            TowerType::Tesla => ResourceCost::new(200, 20, 5, 40),   // Increased costs
         }
     }
 
@@ -213,11 +213,11 @@ pub struct TowerStats {
 impl TowerStats {
     pub fn new(tower_type: TowerType) -> Self {
         let (damage, range, fire_rate) = match tower_type {
-            TowerType::Basic => (15.0, 80.0, 1.0),
-            TowerType::Advanced => (25.0, 100.0, 1.2),
-            TowerType::Laser => (20.0, 120.0, 2.0),
-            TowerType::Missile => (40.0, 90.0, 0.5),
-            TowerType::Tesla => (18.0, 70.0, 0.8),
+            TowerType::Basic => (12.0, 80.0, 0.8),     // Reduced damage and fire rate for balance
+            TowerType::Advanced => (20.0, 100.0, 1.0),   // Reduced damage and fire rate
+            TowerType::Laser => (15.0, 120.0, 1.8),      // Reduced damage and fire rate
+            TowerType::Missile => (35.0, 90.0, 0.4),     // Reduced damage and fire rate
+            TowerType::Tesla => (14.0, 70.0, 0.6),       // Reduced damage and fire rate
         };
 
         Self {
@@ -274,34 +274,34 @@ impl TowerStats {
         
         match self.tower_type {
             TowerType::Basic => {
-                // Balanced upgrade across all stats
-                self.damage = base_damage * (1.0 + (level_multiplier - 1.0) * 0.25);
-                self.range = base_range * (1.0 + (level_multiplier - 1.0) * 0.15);
-                self.fire_rate = base_fire_rate * (1.0 + (level_multiplier - 1.0) * 0.20);
+                // Balanced upgrade across all stats - REBALANCED for fair progression
+                self.damage = base_damage * (1.0 + (level_multiplier - 1.0) * 0.15);     // Reduced from 0.25
+                self.range = base_range * (1.0 + (level_multiplier - 1.0) * 0.12);       // Reduced from 0.15
+                self.fire_rate = base_fire_rate * (1.0 + (level_multiplier - 1.0) * 0.15); // Reduced from 0.20
             },
             TowerType::Advanced => {
-                // Focus on damage improvement
-                self.damage = base_damage * (1.0 + (level_multiplier - 1.0) * 0.35);
-                self.range = base_range * (1.0 + (level_multiplier - 1.0) * 0.12);
-                self.fire_rate = base_fire_rate * (1.0 + (level_multiplier - 1.0) * 0.15);
+                // Focus on damage improvement - REBALANCED to prevent overpowering
+                self.damage = base_damage * (1.0 + (level_multiplier - 1.0) * 0.18);     // Reduced from 0.35
+                self.range = base_range * (1.0 + (level_multiplier - 1.0) * 0.10);       // Reduced from 0.12
+                self.fire_rate = base_fire_rate * (1.0 + (level_multiplier - 1.0) * 0.12); // Reduced from 0.15
             },
             TowerType::Laser => {
-                // Focus on fire rate (high accuracy, rapid fire)
-                self.damage = base_damage * (1.0 + (level_multiplier - 1.0) * 0.20);
-                self.range = base_range * (1.0 + (level_multiplier - 1.0) * 0.10);
-                self.fire_rate = base_fire_rate * (1.0 + (level_multiplier - 1.0) * 0.40);
+                // Focus on fire rate (high accuracy, rapid fire) - REBALANCED
+                self.damage = base_damage * (1.0 + (level_multiplier - 1.0) * 0.15);     // Consistent scaling
+                self.range = base_range * (1.0 + (level_multiplier - 1.0) * 0.08);       // Reduced from 0.10
+                self.fire_rate = base_fire_rate * (1.0 + (level_multiplier - 1.0) * 0.25); // Reduced from 0.40
             },
             TowerType::Missile => {
-                // Focus on damage (area damage, explosive)
-                self.damage = base_damage * (1.0 + (level_multiplier - 1.0) * 0.45);
-                self.range = base_range * (1.0 + (level_multiplier - 1.0) * 0.10);
-                self.fire_rate = base_fire_rate * (1.0 + (level_multiplier - 1.0) * 0.10);
+                // Focus on damage (area damage, explosive) - REBALANCED to prevent dominance
+                self.damage = base_damage * (1.0 + (level_multiplier - 1.0) * 0.20);     // Reduced from 0.45
+                self.range = base_range * (1.0 + (level_multiplier - 1.0) * 0.08);       // Reduced from 0.10
+                self.fire_rate = base_fire_rate * (1.0 + (level_multiplier - 1.0) * 0.08); // Reduced from 0.10
             },
             TowerType::Tesla => {
-                // Focus on range (chain lightning, area coverage)
-                self.damage = base_damage * (1.0 + (level_multiplier - 1.0) * 0.25);
-                self.range = base_range * (1.0 + (level_multiplier - 1.0) * 0.30);
-                self.fire_rate = base_fire_rate * (1.0 + (level_multiplier - 1.0) * 0.15);
+                // Focus on range (chain lightning, area coverage) - REBALANCED
+                self.damage = base_damage * (1.0 + (level_multiplier - 1.0) * 0.15);     // Reduced from 0.25
+                self.range = base_range * (1.0 + (level_multiplier - 1.0) * 0.20);       // Reduced from 0.30
+                self.fire_rate = base_fire_rate * (1.0 + (level_multiplier - 1.0) * 0.12); // Reduced from 0.15
             },
         }
     }
