@@ -4,10 +4,11 @@ use bevy::prelude::{Entity, Vec2};
 
 #[test]
 fn test_projectile_creation() {
-    let projectile = Projectile::default();
+    let target_entity = Entity::from_raw(1);
+    let projectile = Projectile::new(10.0, 200.0, target_entity, Vec2::ZERO, TowerType::Basic);
     assert_eq!(projectile.damage, 10.0);
     assert_eq!(projectile.speed, 200.0);
-    assert_eq!(projectile.target_entity, Entity::PLACEHOLDER);
+    assert_eq!(projectile.target_entity, target_entity);
     assert_eq!(projectile.target_position, Vec2::ZERO);
     assert_eq!(projectile.tower_type, TowerType::Basic);
 }
@@ -27,16 +28,18 @@ fn test_projectile_with_target() {
 
 #[test]
 fn test_projectile_no_target() {
-    let projectile = Projectile::new(20.0, 180.0, Entity::PLACEHOLDER, Vec2::ZERO, TowerType::Basic);
+    let no_target = Entity::from_raw(0); // Use a valid entity for no-target scenarios
+    let projectile = Projectile::new(20.0, 180.0, no_target, Vec2::ZERO, TowerType::Basic);
     
-    assert_eq!(projectile.target_entity, Entity::PLACEHOLDER);
+    assert_eq!(projectile.target_entity, no_target);
     assert_eq!(projectile.target_position, Vec2::ZERO);
 }
 
 #[test]
 fn test_projectile_target_assignment() {
-    let mut projectile = Projectile::default();
-    assert_eq!(projectile.target_entity, Entity::PLACEHOLDER);
+    let initial_target = Entity::from_raw(1);
+    let mut projectile = Projectile::new(10.0, 200.0, initial_target, Vec2::ZERO, TowerType::Basic);
+    assert_eq!(projectile.target_entity, initial_target);
     
     let new_target = Entity::from_raw(123);
     let new_position = Vec2::new(50.0, 75.0);
@@ -49,8 +52,9 @@ fn test_projectile_target_assignment() {
 
 #[test]
 fn test_projectile_damage_variations() {
-    let weak_projectile = Projectile::new(5.0, 200.0, Entity::PLACEHOLDER, Vec2::ZERO, TowerType::Basic);
-    let strong_projectile = Projectile::new(50.0, 200.0, Entity::PLACEHOLDER, Vec2::ZERO, TowerType::Tesla);
+    let target = Entity::from_raw(100);
+    let weak_projectile = Projectile::new(5.0, 200.0, target, Vec2::ZERO, TowerType::Basic);
+    let strong_projectile = Projectile::new(50.0, 200.0, target, Vec2::ZERO, TowerType::Tesla);
     
     assert!(weak_projectile.damage < strong_projectile.damage);
     assert_eq!(weak_projectile.tower_type, TowerType::Basic);
