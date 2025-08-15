@@ -4,6 +4,63 @@ use crate::components::*;
 use crate::systems::input_system::MouseInputState;
 
 // ============================================================================
+// UI COLOR CONSTANTS
+// ============================================================================
+
+/// Professional color palette inspired by Bloons TD6 with enhanced visual hierarchy
+struct UIColors;
+
+impl UIColors {
+    // Panel colors - Enhanced with subtle gradients
+    const PANEL_BG: Color = Color::srgb(0.08, 0.12, 0.18);           // Darker, more premium feel
+    const PANEL_BORDER: Color = Color::srgb(0.22, 0.28, 0.38);       // Softer border
+    const PANEL_SHADOW: Color = Color::srgb(0.02, 0.03, 0.08);       // Shadow/depth
+    const HEADER_BG: Color = Color::srgb(0.06, 0.10, 0.16);          // Even darker header
+    
+    // Button states - Improved contrast and visual feedback
+    const BUTTON_DEFAULT: Color = Color::srgb(0.15, 0.20, 0.28);     // Slightly darker default
+    const BUTTON_HOVER: Color = Color::srgb(0.20, 0.28, 0.38);       // More pronounced hover
+    const BUTTON_SELECTED: Color = Color::srgb(0.12, 0.40, 0.70);    // Refined blue selection
+    const BUTTON_SELECTED_HOVER: Color = Color::srgb(0.18, 0.48, 0.78); // Enhanced selected hover
+    const BUTTON_DISABLED: Color = Color::srgb(0.10, 0.12, 0.16);    // Clearly disabled state
+    
+    // Border colors - Better visual hierarchy
+    const BORDER_DEFAULT: Color = Color::srgb(0.32, 0.38, 0.48);     // Subtle default
+    const BORDER_HOVER: Color = Color::srgb(0.48, 0.58, 0.70);       // Clear hover indication
+    const BORDER_SELECTED: Color = Color::srgb(0.35, 0.60, 0.85);    // Strong selection
+    const BORDER_SELECTED_HOVER: Color = Color::srgb(0.45, 0.70, 0.95); // Bright selected hover
+    const BORDER_DISABLED: Color = Color::srgb(0.18, 0.22, 0.28);    // Muted disabled
+    
+    // Text colors - Enhanced readability and hierarchy
+    const TEXT_PRIMARY: Color = Color::srgb(0.96, 0.96, 0.98);       // Crisp white text
+    const TEXT_SECONDARY: Color = Color::srgb(0.78, 0.82, 0.88);     // Clear secondary
+    const TEXT_MUTED: Color = Color::srgb(0.58, 0.62, 0.68);         // Subtle muted text
+    const TEXT_ACCENT: Color = Color::srgb(0.88, 0.92, 0.62);        // Warmer yellow
+    const TEXT_SUCCESS: Color = Color::srgb(0.58, 0.88, 0.68);       // Clear green
+    const TEXT_WARNING: Color = Color::srgb(1.0, 0.78, 0.58);        // Warm orange
+    const TEXT_ERROR: Color = Color::srgb(1.0, 0.58, 0.58);          // Clear red
+    const TEXT_INFO: Color = Color::srgb(0.58, 0.78, 1.0);           // Cool blue info
+    
+    // Tooltip colors - Enhanced readability
+    const TOOLTIP_BG: Color = Color::srgba(0.02, 0.05, 0.12, 0.96);  // Darker, more opaque
+    const TOOLTIP_BORDER: Color = Color::srgb(0.38, 0.48, 0.62);     // Clearer border
+    const TOOLTIP_SHADOW: Color = Color::srgba(0.0, 0.0, 0.0, 0.4);  // Subtle shadow
+    
+    // Resource colors - Better visual coding
+    const RESOURCE_BG: Color = Color::srgb(0.06, 0.08, 0.12);        // Consistent with panel
+    const RESOURCE_BORDER: Color = Color::srgb(0.18, 0.22, 0.28);    // Subtle border
+    const RESOURCE_MONEY: Color = Color::srgb(0.88, 0.92, 0.62);     // Gold for money
+    const RESOURCE_RESEARCH: Color = Color::srgb(0.58, 0.78, 1.0);   // Blue for research
+    const RESOURCE_MATERIALS: Color = Color::srgb(0.78, 0.68, 0.58); // Brown for materials
+    const RESOURCE_ENERGY: Color = Color::srgb(0.88, 0.58, 0.88);    // Purple for energy
+    
+    // Cost affordability colors
+    const COST_AFFORDABLE: Color = Color::srgb(0.58, 0.88, 0.68);    // Green when affordable
+    const COST_EXPENSIVE: Color = Color::srgb(1.0, 0.78, 0.58);      // Orange when expensive
+    const COST_UNAFFORDABLE: Color = Color::srgb(1.0, 0.58, 0.58);   // Red when can't afford
+}
+
+// ============================================================================
 // TOWER UI STATE MANAGEMENT
 // ============================================================================
 
@@ -99,6 +156,21 @@ pub struct UpgradeButton;
 #[derive(Component)]
 pub struct SelectedTowerIndicator;
 
+/// Component for tower tooltips
+#[derive(Component)]
+pub struct TowerTooltip;
+
+/// Component for resource status display
+#[derive(Component)]
+pub struct ResourceStatus;
+
+/// Component for hover state management
+#[derive(Component)]
+pub struct HoverState {
+    pub is_hovered: bool,
+    pub tower_type: TowerType,
+}
+
 // ============================================================================
 // UI SYSTEMS
 // ============================================================================
@@ -142,30 +214,42 @@ pub fn tower_selection_system(
     // TODO: This will be moved to the input system or removed when keyboard controls are removed
 }
 
-/// System to handle tower type button clicks
+/// System to handle tower type button clicks with enhanced styling
 pub fn tower_type_button_system(
     mut selection_state: ResMut<TowerSelectionState>,
     mut interaction_query: Query<
-        (&Interaction, &TowerTypeButton, &mut BackgroundColor),
+        (&Interaction, &TowerTypeButton, &mut BackgroundColor, &mut BorderColor, &mut HoverState),
         (Changed<Interaction>, With<Button>),
     >,
 ) {
-    for (interaction, tower_button, mut color) in interaction_query.iter_mut() {
+    for (interaction, tower_button, mut bg_color, mut border_color, mut hover_state) in interaction_query.iter_mut() {
+        let is_selected = Some(tower_button.tower_type) == selection_state.selected_placement_type;
+        
         match *interaction {
             Interaction::Pressed => {
                 selection_state.set_placement_mode(Some(tower_button.tower_type));
-                *color = Color::srgb(0.6, 0.6, 0.9).into(); // Highlight selected
+                *bg_color = UIColors::BUTTON_SELECTED.into();
+                *border_color = UIColors::BORDER_SELECTED.into();
                 println!("Selected tower type: {:?}", tower_button.tower_type);
             }
             Interaction::Hovered => {
-                *color = Color::srgb(0.8, 0.8, 1.0).into(); // Hover effect
+                hover_state.is_hovered = true;
+                if is_selected {
+                    *bg_color = UIColors::BUTTON_SELECTED_HOVER.into();
+                    *border_color = UIColors::BORDER_SELECTED_HOVER.into();
+                } else {
+                    *bg_color = UIColors::BUTTON_HOVER.into();
+                    *border_color = UIColors::BORDER_HOVER.into();
+                }
             }
             Interaction::None => {
-                // Check if this is the currently selected tower type
-                if Some(tower_button.tower_type) == selection_state.selected_placement_type {
-                    *color = Color::srgb(0.6, 0.6, 0.9).into(); // Keep highlighted
+                hover_state.is_hovered = false;
+                if is_selected {
+                    *bg_color = UIColors::BUTTON_SELECTED.into();
+                    *border_color = UIColors::BORDER_SELECTED.into();
                 } else {
-                    *color = Color::srgb(0.7, 0.7, 0.7).into(); // Default color
+                    *bg_color = UIColors::BUTTON_DEFAULT.into();
+                    *border_color = UIColors::BORDER_DEFAULT.into();
                 }
             }
         }
@@ -241,7 +325,7 @@ pub fn selected_tower_indicator_system(
 // UI SETUP FUNCTIONS
 // ============================================================================
 
-/// Setup the tower placement UI panel
+/// Setup the Bloons TD6-style tower placement UI panel
 pub fn setup_tower_placement_panel(mut commands: Commands) {
     commands
         .spawn((
@@ -249,59 +333,113 @@ pub fn setup_tower_placement_panel(mut commands: Commands) {
                 position_type: PositionType::Absolute,
                 right: Val::Px(20.0),
                 top: Val::Px(20.0),
-                width: Val::Px(200.0),
-                height: Val::Px(300.0),
+                width: Val::Px(250.0),   // Slightly wider for better proportions
+                height: Val::Px(420.0),  // Taller to accommodate better spacing
                 flex_direction: FlexDirection::Column,
-                padding: UiRect::all(Val::Px(10.0)),
-                row_gap: Val::Px(5.0),
+                padding: UiRect::all(Val::Px(16.0)),  // More generous padding
+                border: UiRect::all(Val::Px(2.0)),
                 ..default()
             },
-            BackgroundColor(Color::srgba(0.2, 0.2, 0.2, 0.9)),
+            BackgroundColor(UIColors::PANEL_BG),
+            BorderColor(UIColors::PANEL_BORDER),
             TowerPlacementPanel,
         ))
         .with_children(|parent| {
-            // Title
+            // Panel title with enhanced typography and visual hierarchy
             parent.spawn((
-                Text::new("Tower Placement"),
+                Text::new("TOWER SELECTION"),
                 TextFont {
-                    font_size: 18.0,
+                    font_size: 20.0,  // More prominent title
                     ..default()
                 },
-                TextColor(Color::WHITE),
+                TextColor(UIColors::TEXT_PRIMARY),
+                Node {
+                    margin: UiRect::bottom(Val::Px(18.0)),  // Better spacing
+                    align_self: AlignSelf::Center,
+                    ..default()
+                },
             ));
 
-            // Tower type buttons
-            create_tower_type_button(parent, TowerType::Basic, "Basic Tower\n$25");
-            create_tower_type_button(parent, TowerType::Advanced, "Advanced Tower\n$50 + Materials");
-            create_tower_type_button(parent, TowerType::Laser, "Laser Tower\n$75 + Research");
-            create_tower_type_button(parent, TowerType::Missile, "Missile Tower\n$100 + Materials");
-            create_tower_type_button(parent, TowerType::Tesla, "Tesla Tower\n$120 + Energy");
+            // 2-column grid container for tower buttons
+            parent.spawn((
+                Node {
+                    width: Val::Percent(100.0),
+                    flex_direction: FlexDirection::Column,
+                    row_gap: Val::Px(12.0),  // Better vertical rhythm
+                    ..default()
+                },
+            )).with_children(|grid_container| {
+                // Row 1: Basic (B) + Advanced (A)
+                create_tower_button_row(grid_container, 
+                    &[(TowerType::Basic, 'B'), (TowerType::Advanced, 'A')]);
+                
+                // Row 2: Laser (L) + Missile (M)
+                create_tower_button_row(grid_container, 
+                    &[(TowerType::Laser, 'L'), (TowerType::Missile, 'M')]);
+                
+                // Row 3: Tesla (T) - full width
+                create_tower_button_full_width(grid_container, TowerType::Tesla, 'T');
+            });
 
-            // Clear selection button
-            parent
-                .spawn((
-                    Button,
-                    Node {
-                        width: Val::Percent(100.0),
-                        height: Val::Px(30.0),
-                        justify_content: JustifyContent::Center,
-                        align_items: AlignItems::Center,
-                        margin: UiRect::top(Val::Px(10.0)),
+            // Resource status footer
+            parent.spawn((
+                Node {
+                    width: Val::Percent(100.0),
+                    height: Val::Px(40.0),
+                    padding: UiRect::all(Val::Px(8.0)),
+                    margin: UiRect::top(Val::Px(15.0)),
+                    border: UiRect::all(Val::Px(1.0)),
+                    justify_content: JustifyContent::Center,
+                    align_items: AlignItems::Center,
+                    ..default()
+                },
+                BackgroundColor(UIColors::RESOURCE_BG),
+                BorderColor(UIColors::RESOURCE_BORDER),
+                ResourceStatus,
+            )).with_children(|footer| {
+                footer.spawn((
+                    Text::new("$-- | R:-- | M:-- | E:--"),
+                    TextFont {
+                        font_size: 12.0,
                         ..default()
                     },
-                    BackgroundColor(Color::srgb(0.6, 0.4, 0.4)),
-                ))
-                .with_children(|button| {
-                    button.spawn((
-                        Text::new("Clear Selection"),
-                        TextFont {
-                            font_size: 14.0,
-                            ..default()
-                        },
-                        TextColor(Color::WHITE),
-                    ));
-                });
+                    TextColor(UIColors::TEXT_ACCENT),
+                    ResourceStatusText,
+                ));
+            });
         });
+
+    // Create enhanced tooltip container with better styling
+    commands.spawn((
+        Node {
+            position_type: PositionType::Absolute,
+            display: Display::None,
+            width: Val::Px(220.0),  // Wider for better readability
+            padding: UiRect::all(Val::Px(12.0)),  // More generous padding
+            border: UiRect::all(Val::Px(2.0)),  // Thicker border for definition
+            flex_direction: FlexDirection::Column,
+            row_gap: Val::Px(4.0),  // Better vertical spacing
+            ..default()
+        },
+        BackgroundColor(UIColors::TOOLTIP_BG),
+        BorderColor(UIColors::TOOLTIP_BORDER),
+        TowerTooltip,
+    ))
+    .with_children(|tooltip| {
+        tooltip.spawn((
+            Text::new(""),
+            TextFont {
+                font_size: 12.0,  // Improved readability
+                ..default()
+            },
+            TextColor(UIColors::TEXT_PRIMARY),
+            Node {
+                align_self: AlignSelf::Start,
+                ..default()
+            },
+            TooltipText,
+        ));
+    });
 }
 
 /// Setup the tower upgrade UI panel
@@ -408,29 +546,88 @@ pub fn setup_tower_upgrade_panel(mut commands: Commands) {
         });
 }
 
-/// Helper function to create tower type buttons
-fn create_tower_type_button(parent: &mut ChildSpawnerCommands, tower_type: TowerType, text: &str) {
+/// Helper function to create a row of two tower buttons
+fn create_tower_button_row(parent: &mut ChildSpawnerCommands, tower_pairs: &[(TowerType, char)]) {
+    parent.spawn((
+        Node {
+            width: Val::Percent(100.0),
+            flex_direction: FlexDirection::Row,
+            column_gap: Val::Px(12.0),  // Better horizontal rhythm
+            ..default()
+        },
+    )).with_children(|row| {
+        for (tower_type, letter) in tower_pairs {
+            create_single_tower_button(row, *tower_type, *letter, false);
+        }
+    });
+}
+
+/// Helper function to create a full-width tower button (for Tesla)
+fn create_tower_button_full_width(parent: &mut ChildSpawnerCommands, tower_type: TowerType, letter: char) {
+    create_single_tower_button(parent, tower_type, letter, true);
+}
+
+/// Core function to create individual tower buttons with enhanced styling and affordability feedback
+fn create_single_tower_button(parent: &mut ChildSpawnerCommands, tower_type: TowerType, letter: char, full_width: bool) {
+    let width = if full_width { 
+        Val::Percent(100.0) 
+    } else { 
+        Val::Px(106.0) 
+    };
+    
     parent
         .spawn((
             Button,
             Node {
-                width: Val::Percent(100.0),
-                height: Val::Px(45.0),
+                width,
+                height: Val::Px(84.0),  // Slightly taller for better proportions
                 justify_content: JustifyContent::Center,
                 align_items: AlignItems::Center,
+                border: UiRect::all(Val::Px(2.0)),
+                flex_direction: FlexDirection::Column,
+                padding: UiRect::all(Val::Px(4.0)),  // Inner padding for better spacing
                 ..default()
             },
-            BackgroundColor(Color::srgb(0.7, 0.7, 0.7)),
+            BackgroundColor(UIColors::BUTTON_DEFAULT),
+            BorderColor(UIColors::BORDER_DEFAULT),
             TowerTypeButton { tower_type },
+            HoverState { is_hovered: false, tower_type },
         ))
         .with_children(|button| {
+            // Single letter label with enhanced hierarchy
             button.spawn((
-                Text::new(text),
+                Text::new(letter.to_string()),
                 TextFont {
-                    font_size: 12.0,
+                    font_size: 28.0,  // Balanced size for clarity
                     ..default()
                 },
-                TextColor(Color::BLACK),
+                TextColor(UIColors::TEXT_PRIMARY),
+                Node {
+                    margin: UiRect::bottom(Val::Px(4.0)),  // Balanced spacing
+                    align_self: AlignSelf::Center,
+                    ..default()
+                },
+            ));
+            
+            // Enhanced cost indicator with better formatting
+            let cost = tower_type.get_cost();
+            let cost_text = if cost.money > 0 && (cost.research_points > 0 || cost.materials > 0 || cost.energy > 0) {
+                format!("${}+", cost.money) // Show + for complex costs
+            } else {
+                format!("${}", cost.money)
+            };
+            
+            button.spawn((
+                Text::new(cost_text),
+                TextFont {
+                    font_size: 12.0,  // Improved readability
+                    ..default()
+                },
+                TextColor(UIColors::TEXT_ACCENT),
+                Node {
+                    align_self: AlignSelf::Center,
+                    ..default()
+                },
             ));
         });
 }
@@ -458,9 +655,108 @@ pub struct UpgradeCostText;
 #[derive(Component)]
 pub struct UpgradeButtonText;
 
+#[derive(Component)]
+pub struct ResourceStatusText;
+
+#[derive(Component)]
+pub struct TooltipText;
+
 // ============================================================================
 // UI UPDATE SYSTEMS  
 // ============================================================================
+
+/// Enhanced system to update resource status display with better formatting
+pub fn update_resource_status_system(
+    economy: Res<Economy>,
+    mut resource_query: Query<&mut Text, With<ResourceStatusText>>,
+) {
+    if economy.is_changed() {
+        if let Ok(mut text) = resource_query.single_mut() {
+            // Enhanced formatting with better visual separation and readability
+            **text = format!(
+                "\u{1F4B0} {} \u{2022} \u{1F4D6} {} \u{2022} \u{1F6E0} {} \u{2022} \u{26A1} {}",
+                economy.money,
+                economy.research_points,
+                economy.materials,
+                economy.energy
+            );
+        }
+    }
+}
+
+/// System to handle hover tooltips for tower buttons
+pub fn tower_tooltip_system(
+    hover_query: Query<(&HoverState, &Node), (With<TowerTypeButton>, Changed<HoverState>)>,
+    mut tooltip_query: Query<(&mut Node, &mut Text), (With<TowerTooltip>, Without<TowerTypeButton>)>,
+    economy: Res<Economy>,
+) {
+    let mut show_tooltip = false;
+    let mut tooltip_content = String::new();
+    let mut tooltip_position = (0.0, 0.0);
+
+    // Check for hovered buttons
+    for (hover_state, button_node) in hover_query.iter() {
+        if hover_state.is_hovered {
+            show_tooltip = true;
+            let tower_type = hover_state.tower_type;
+            let cost = tower_type.get_cost();
+            let stats = TowerStats::new(tower_type);
+            let can_afford = economy.can_afford(&cost);
+            
+            // Calculate DPS (Damage Per Second) for enhanced tooltip
+            let dps = stats.damage * stats.fire_rate;
+            
+            // Enhanced formatting with better visual hierarchy
+            let mut cost_parts = Vec::new();
+            cost_parts.push(format!("${}", cost.money));
+            if cost.research_points > 0 {
+                cost_parts.push(format!("R:{}", cost.research_points));
+            }
+            if cost.materials > 0 {
+                cost_parts.push(format!("M:{}", cost.materials));
+            }
+            if cost.energy > 0 {
+                cost_parts.push(format!("E:{}", cost.energy));
+            }
+            let cost_display = cost_parts.join(" | ");
+            
+            // Affordability status with clear indicators
+            let affordability = if can_afford {
+                "\u{2713} AFFORDABLE"
+            } else {
+                "\u{2717} INSUFFICIENT RESOURCES"
+            };
+            
+            tooltip_content = format!(
+                "{}\n{}\n\nCost: {}\nStatus: {}\n\nPerformance:\n\u{2022} DPS: {:.1}\n\u{2022} Damage: {:.1}\n\u{2022} Range: {:.1}\n\u{2022} Fire Rate: {:.1}/sec",
+                tower_type.get_name(),
+                tower_type.get_description(),
+                cost_display,
+                affordability,
+                dps,
+                stats.damage,
+                stats.range,
+                stats.fire_rate
+            );
+            
+            // Improved positioning - left side with better offset for readability
+            tooltip_position = (30.0, 100.0); // Better positioning
+            break;
+        }
+    }
+
+    // Update tooltip visibility and content
+    if let Ok((mut tooltip_node, mut tooltip_text)) = tooltip_query.single_mut() {
+        if show_tooltip {
+            tooltip_node.display = Display::Flex;
+            tooltip_node.left = Val::Px(tooltip_position.0);
+            tooltip_node.top = Val::Px(tooltip_position.1);
+            **tooltip_text = tooltip_content;
+        } else {
+            tooltip_node.display = Display::None;
+        }
+    }
+}
 
 /// System to update the upgrade panel content based on selected tower
 pub fn update_upgrade_panel_system(
@@ -576,6 +872,52 @@ pub fn update_upgrade_panel_system(
         }
         if let Ok(mut text) = upgrade_button_query.single_mut() {
             **text = "SELECT TOWER".to_string();
+        }
+    }
+}
+
+/// System to provide real-time affordability feedback on tower buttons
+pub fn tower_affordability_system(
+    economy: Res<Economy>,
+    selection_state: Res<TowerSelectionState>,
+    mut button_query: Query<(&TowerTypeButton, &mut BackgroundColor, &mut BorderColor), (With<Button>, Without<HoverState>)>,
+    hover_query: Query<&HoverState, With<TowerTypeButton>>,
+) {
+    if economy.is_changed() {
+        for (tower_button, mut bg_color, mut border_color) in button_query.iter_mut() {
+            let cost = tower_button.tower_type.get_cost();
+            let can_afford = economy.can_afford(&cost);
+            let is_selected = Some(tower_button.tower_type) == selection_state.selected_placement_type;
+            
+            // Check if button is currently hovered
+            let is_hovered = hover_query.iter().any(|hover| hover.tower_type == tower_button.tower_type && hover.is_hovered);
+            
+            // Apply colors based on state with enhanced visual feedback
+            if is_selected {
+                if is_hovered {
+                    *bg_color = UIColors::BUTTON_SELECTED_HOVER.into();
+                    *border_color = UIColors::BORDER_SELECTED_HOVER.into();
+                } else {
+                    *bg_color = UIColors::BUTTON_SELECTED.into();
+                    *border_color = UIColors::BORDER_SELECTED.into();
+                }
+            } else if !can_afford {
+                if is_hovered {
+                    *bg_color = UIColors::BUTTON_HOVER.into();
+                    *border_color = UIColors::BORDER_DISABLED.into();
+                } else {
+                    *bg_color = UIColors::BUTTON_DISABLED.into();
+                    *border_color = UIColors::BORDER_DISABLED.into();
+                }
+            } else {
+                if is_hovered {
+                    *bg_color = UIColors::BUTTON_HOVER.into();
+                    *border_color = UIColors::BORDER_HOVER.into();
+                } else {
+                    *bg_color = UIColors::BUTTON_DEFAULT.into();
+                    *border_color = UIColors::BORDER_DEFAULT.into();
+                }
+            }
         }
     }
 }

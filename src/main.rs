@@ -8,7 +8,7 @@ mod systems;
 // Explicit imports to prevent namespace pollution
 use resources::{Economy, GameState, Score, WaveManager, EnemyPath};
 use systems::enemy_system::{enemy_spawning_system, enemy_movement_system, enemy_cleanup_system};
-use systems::input_system::{mouse_input_system, setup_placement_zones, MouseInputState};
+use systems::input_system::{mouse_input_system, tower_placement_system, tower_placement_preview_system, setup_placement_zones, MouseInputState};
 use systems::ui_system::{update_ui_system};
 use systems::combat_system::{tower_targeting_system, projectile_spawning_system, projectile_movement_system, collision_system, game_state_system, WaveStatus};
 use systems::debug_visualization::{DebugVisualizationState, debug_toggle_system, debug_visualization_system};
@@ -23,6 +23,9 @@ use systems::tower_ui::{
     upgrade_button_system,
     update_upgrade_panel_system,
     selected_tower_indicator_system,
+    update_resource_status_system,
+    tower_tooltip_system,
+    tower_affordability_system,
 };
 
 fn main() {
@@ -56,8 +59,8 @@ fn main() {
         .add_systems(Update, (
             // Input and UI systems
             mouse_input_system,
-            // tower_placement_system, // Disabled due to UI dependency
-            // tower_placement_preview_system, // Disabled due to UI dependency
+            tower_placement_system,
+            tower_placement_preview_system,
             update_ui_system,
         ))
         .add_systems(Update, (
@@ -66,6 +69,9 @@ fn main() {
             upgrade_button_system,
             update_upgrade_panel_system,
             selected_tower_indicator_system,
+            update_resource_status_system,
+            tower_tooltip_system,
+            tower_affordability_system,
         ))
         .add_systems(Update, (
             // Debug visualization systems

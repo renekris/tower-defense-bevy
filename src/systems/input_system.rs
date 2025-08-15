@@ -92,12 +92,11 @@ pub fn mouse_input_system(
     }
 }
 
-// Tower placement system - DISABLED due to UI dependencies
-/*
+/// Tower placement system - Re-enabled with proper dependencies
 pub fn tower_placement_system(
     mut commands: Commands,
     mouse_state: Res<MouseInputState>,
-    // tower_selection_state: Res<TowerSelectionState>,
+    tower_selection_state: Res<TowerSelectionState>,
     mut economy: ResMut<Economy>,
     existing_towers: Query<&Transform, With<TowerStats>>,
     enemy_path: Res<EnemyPath>,
@@ -136,14 +135,12 @@ pub fn tower_placement_system(
         }
     }
 }
-*/
 
-// Preview system for tower placement - DISABLED due to UI dependencies
-/*
+/// Preview system for tower placement - Re-enabled with proper dependencies
 pub fn tower_placement_preview_system(
     mut commands: Commands,
     mouse_state: Res<MouseInputState>,
-    // tower_selection_state: Res<TowerSelectionState>,
+    tower_selection_state: Res<TowerSelectionState>,
     existing_previews: Query<Entity, With<PlacementPreview>>,
     economy: Res<Economy>,
     existing_towers: Query<&Transform, With<TowerStats>>,
@@ -193,7 +190,6 @@ pub fn tower_placement_preview_system(
         }
     }
 }
-*/
 
 // Utility functions
 pub fn screen_to_world_position(
