@@ -16,7 +16,7 @@ pub struct Economy {
 impl Default for Economy {
     fn default() -> Self {
         Self {
-            money: 50,              // Reduced from 100 - players must be strategic
+            money: 155,             // Increased to allow 3 basic towers (3×40=120) + 35 buffer
             research_points: 0,
             materials: 5,           // Reduced from 10 - materials should be scarce
             energy: 30,             // Reduced from 50 - energy management matters

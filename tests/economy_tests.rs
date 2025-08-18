@@ -3,7 +3,7 @@ use tower_defense_bevy::resources::*;
 #[test]
 fn test_economy_creation() {
     let economy = Economy::default();
-    assert_eq!(economy.money, 50);      // Rebalanced from 100
+    assert_eq!(economy.money, 155);     // Increased to allow 3 basic towers + buffer
     assert_eq!(economy.research_points, 0);
     assert_eq!(economy.materials, 5);       // Rebalanced from 10
     assert_eq!(economy.energy, 30);         // Rebalanced from 50
@@ -16,7 +16,7 @@ fn test_economy_spend_money() {
     
     assert!(economy.can_afford(&cost));
     economy.spend(&cost);
-    assert_eq!(economy.money, 0);           // 50 - 50 = 0
+    assert_eq!(economy.money, 105);         // 155 - 50 = 105
 }
 
 #[test]
@@ -26,7 +26,7 @@ fn test_economy_insufficient_funds() {
     
     assert!(!economy.can_afford(&cost));
     economy.spend(&cost);
-    assert_eq!(economy.money, 50);  // Should not change from new starting value
+    assert_eq!(economy.money, 155); // Should not change from new starting value
 }
 
 #[test]
@@ -48,7 +48,7 @@ fn test_economy_earn_resources() {
     let reward = ResourceReward::new(25, 3, 1, 5);
     
     economy.earn(&reward);
-    assert_eq!(economy.money, 75);          // 50 + 25 = 75
+    assert_eq!(economy.money, 180);         // 155 + 25 = 180
     assert_eq!(economy.research_points, 3);
     assert_eq!(economy.materials, 6);       // 5 + 1 = 6
     assert_eq!(economy.energy, 35);         // 30 + 5 = 35
@@ -61,7 +61,7 @@ fn test_economy_resource_generation_over_time() {
     economy.generate_passive_income(1.0); // 1 second passed
     
     // Rebalanced passive generation rates
-    assert_eq!(economy.money, 50);          // 50 + 0.5 = 50 (rounded down)
+    assert_eq!(economy.money, 155);         // 155 + 0.5 = 155 (rounded down)
     assert_eq!(economy.research_points, 0); // 0 + 0.3 = 0 (rounded down)
     assert_eq!(economy.materials, 5);       // No passive generation
     assert_eq!(economy.energy, 32);         // 30 + 2.0 = 32
