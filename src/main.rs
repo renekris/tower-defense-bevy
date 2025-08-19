@@ -6,18 +6,20 @@ mod resources;
 mod systems;
 
 // Explicit imports to prevent namespace pollution
-use resources::{Economy, GameState, Score, WaveManager, EnemyPath};
+use resources::{Economy, GameState, Score, WaveManager, EnemyPath, AppState, GameSystemSet};
 use systems::enemy_system::{enemy_spawning_system, enemy_movement_system, enemy_cleanup_system};
-use systems::input_system::{mouse_input_system, tower_placement_system, tower_placement_preview_system, setup_placement_zones, MouseInputState};
+use systems::input_system::{mouse_input_system, tower_placement_system, tower_placement_preview_system, MouseInputState, auto_grid_mode_system};
 use systems::ui_system::{update_ui_system};
 use systems::combat_system::{tower_targeting_system, projectile_spawning_system, projectile_movement_system, collision_system, game_state_system, WaveStatus};
 use systems::debug_visualization::{DebugVisualizationState, debug_toggle_system, debug_visualization_system};
 use systems::debug_ui::{DebugUIState, debug_ui_toggle_system, setup_debug_ui, DebugUIPlugin};
-use systems::enemy_system::{manual_wave_system};
+use systems::enemy_system::{manual_wave_system, path_generation_system, path_visualization_system, StartWaveEvent};
 use systems::tower_ui::{
     TowerSelectionState, 
+    TowerStatPopupState,
     setup_tower_placement_panel, 
     setup_tower_upgrade_panel,
+    setup_tower_stat_popup,
     tower_selection_system,
     tower_type_button_system,
     upgrade_button_system,
@@ -26,7 +28,24 @@ use systems::tower_ui::{
     update_resource_status_system,
     tower_tooltip_system,
     tower_affordability_system,
+    tower_stat_popup_system,
+    hover_stat_popup_system,
+    popup_close_button_system,
+    popup_outside_click_system,
+    start_wave_button_system,
+    update_start_wave_button_system,
 };
+use systems::unified_grid::{
+    UnifiedGridSystem,
+    setup_unified_grid,
+    update_grid_visualization,
+    grid_mode_toggle_system,
+};
+use systems::obstacle_rendering::ObstacleRenderingPlugin;
+use systems::tower_rendering::TowerRenderingPlugin;
+use systems::path_generation::generate_level_path;
+use systems::pause_system::{PauseSystemPlugin, pause_toggle_system};
+use systems::settings_menu::SettingsSystemPlugin;
 
 fn main() {
     App::new()
@@ -43,7 +62,14 @@ fn main() {
         .add_plugins(BrpExtrasPlugin)
         // Add custom plugins
         .add_plugins(DebugUIPlugin)
-        // Initialize game resources
+        .add_plugins(ObstacleRenderingPlugin)
+        .add_plugins(TowerRenderingPlugin)
+        .add_plugins(PauseSystemPlugin)
+        .add_plugins(SettingsSystemPlugin)
+        // Add events
+        .add_event::<StartWaveEvent>()
+        // Initialize state and resources
+        .init_state::<AppState>()
         .init_resource::<Score>()
         .init_resource::<WaveManager>()
         .init_resource::<GameState>()
@@ -52,28 +78,53 @@ fn main() {
         .init_resource::<WaveStatus>()
         .init_resource::<DebugVisualizationState>()
         .init_resource::<TowerSelectionState>()
-        .insert_resource(create_default_path())
-        // Setup systems
-        .add_systems(Startup, (setup, setup_placement_zones, setup_tower_placement_panel, setup_tower_upgrade_panel))
-        // Game systems - Split into groups to avoid tuple size limits
+        .init_resource::<TowerStatPopupState>()
+        .init_resource::<UnifiedGridSystem>()
+        .insert_resource(generate_level_path(1)) // Start with wave 1 generated path
+        // Configure system sets
+        .configure_sets(Update, (
+            GameSystemSet::Input,
+            GameSystemSet::UI,
+            GameSystemSet::Gameplay,
+        ).chain())
+        // Setup systems - Stat popup last for proper Z-order (renders on top)
+        .add_systems(Startup, (setup, setup_unified_grid, setup_tower_placement_panel, setup_tower_upgrade_panel, setup_tower_stat_popup).chain())
+        // Input systems - run in all states
         .add_systems(Update, (
-            // Input and UI systems
             mouse_input_system,
-            tower_placement_system,
-            tower_placement_preview_system,
-            update_ui_system,
-        ))
+        ).in_set(GameSystemSet::Input))
+        // UI systems - run in all states
         .add_systems(Update, (
-            tower_selection_system,
+            // UI interaction systems (consume UI clicks)
             tower_type_button_system,
             upgrade_button_system,
+            tower_selection_system,
+            popup_close_button_system,
+            popup_outside_click_system,
+            start_wave_button_system,
+            
+            // UI update systems
             update_upgrade_panel_system,
             selected_tower_indicator_system,
             update_resource_status_system,
             tower_tooltip_system,
             tower_affordability_system,
-        ))
+            tower_stat_popup_system,
+            hover_stat_popup_system,
+            update_start_wave_button_system,
+            update_ui_system,
+        ).chain().in_set(GameSystemSet::UI))
+        // Gameplay systems - only run in Playing state
         .add_systems(Update, (
+            // Tower placement systems
+            tower_placement_system,
+            tower_placement_preview_system,
+            
+            // Grid visualization systems
+            auto_grid_mode_system,
+            grid_mode_toggle_system,
+            update_grid_visualization,
+            
             // Debug visualization systems
             debug_toggle_system,
             debug_visualization_system,
@@ -83,19 +134,18 @@ fn main() {
             projectile_spawning_system,
             projectile_movement_system,
             collision_system,
-        ))
-        .add_systems(Update, (
-            // Enemy and wave management
+            
+            // Enemy and wave management (CRITICAL: path generation runs BEFORE spawning)
             manual_wave_system,
+            path_generation_system, // Updates path when wave changes
+            path_visualization_system, // Updates visual path representation
             enemy_spawning_system,
             enemy_movement_system,
             enemy_cleanup_system,
             
             // Game state management (runs last)
             game_state_system,
-            
-            close_on_esc,
-        ))
+        ).in_set(GameSystemSet::Gameplay).run_if(in_state(AppState::Playing)))
         .run();
 }
 
@@ -103,7 +153,7 @@ fn setup(mut commands: Commands) {
     commands.spawn(Camera2d::default());
     
     commands.spawn((
-        Text2d::new("Tower Defense Game - Phase 3 COMBAT!\nSPACE: spawn wave | ESC: exit\n1-5: select tower type | LEFT CLICK: place tower\nF1: toggle debug visualization | F2: debug UI panel | 1-9: select wave (debug mode)\nTowers auto-target and shoot enemies! Defend the base!"),
+        Text2d::new("Tower Defense Game - Phase 3 COMBAT!\nSTART WAVE button: spawn wave | ESC: pause menu\nLEFT CLICK tower button: select | RIGHT CLICK tower button: detailed stats\nLEFT CLICK: place tower | Click tower: upgrade mode\nF1: toggle debug visualization | F2: debug UI panel | F3: grid mode | F4: toggle grid | 1-9: select wave (debug mode)\nTowers auto-target and shoot enemies! Defend the base!"),
         TextFont {
             font_size: 20.0,
             ..default()
@@ -112,24 +162,8 @@ fn setup(mut commands: Commands) {
         Transform::from_translation(Vec3::new(0.0, 330.0, 0.0)),
     ));
 
-    // Draw the path line so players can see where enemies will move
-    let path = create_default_path();
-    for i in 0..path.waypoints.len() - 1 {
-        let start = path.waypoints[i];
-        let end = path.waypoints[i + 1];
-        let midpoint = (start + end) / 2.0;
-        let length = start.distance(end);
-        
-        commands.spawn((
-            Sprite {
-                color: Color::srgb(0.5, 0.5, 0.5),
-                custom_size: Some(Vec2::new(length, 5.0)),
-                ..default()
-            },
-            Transform::from_translation(midpoint.extend(-1.0)),
-            // GamePathLine, // Removed due to UI file being disabled
-        ));
-    }
+    // Initial path visualization - will be updated dynamically by path_visualization_system
+    // This creates placeholder entities that will be updated when the path changes
 }
 
 /// Create a simple straight-line path for Phase 1
@@ -140,11 +174,4 @@ fn create_default_path() -> EnemyPath {
     ])
 }
 
-fn close_on_esc(
-    mut exit: EventWriter<AppExit>,
-    keyboard_input: Res<ButtonInput<KeyCode>>,
-) {
-    if keyboard_input.just_pressed(KeyCode::Escape) {
-        exit.write(AppExit::Success);
-    }
-}
+// ESC key handling moved to pause_toggle_system in PauseSystemPlugin
