@@ -19,4 +19,7 @@ Thumbs.db
 # Logs
 *.log
 
-./CLAUDE.md
+# Screenshots
+*.png
+
+CLAUDE.md
