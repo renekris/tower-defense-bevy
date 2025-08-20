@@ -1,0 +1,21 @@
+[package]
+name = "tower-defense-bevy"
+version = "0.1.0"
+edition = "2021"
+
+[lib]
+name = "tower_defense_bevy"
+path = "src/lib.rs"
+
+[[bin]]
+name = "tower-defense-bevy"
+path = "src/main.rs"
+
+[dependencies]
+bevy = { version = "0.14", features = ["default"] }
+
+[profile.dev]
+opt-level = 1
+
+[profile.dev.package."*"]
+opt-level = 3
