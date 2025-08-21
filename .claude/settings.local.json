@@ -6,7 +6,9 @@
       "Bash(cargo run:*)",
       "mcp__memory__create_entities",
       "Bash(git add:*)",
-      "Bash(cargo clippy:*)"
+      "Bash(cargo clippy:*)",
+      "Bash(cargo check:*)",
+      "Bash(cargo:*)"
     ],
     "deny": [],
     "ask": []

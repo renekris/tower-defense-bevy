@@ -57,8 +57,8 @@ fn create_zone_near_chokepoint(grid: &PathGrid, chokepoint: GridPos, path: &[Gri
     // Look for empty areas adjacent to the chokepoint
     let search_radius = 3;
     
-    for dy in -(search_radius as i32)..=(search_radius as i32) {
-        for dx in -(search_radius as i32)..=(search_radius as i32) {
+    for dy in -search_radius..=search_radius {
+        for dx in -search_radius..=search_radius {
             let x = (chokepoint.x as i32 + dx).max(0).min(grid.width as i32 - 1) as usize;
             let y = (chokepoint.y as i32 + dy).max(0).min(grid.height as i32 - 1) as usize;
             let candidate = GridPos::new(x, y);

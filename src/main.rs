@@ -10,7 +10,18 @@ use systems::input_system::*;
 use systems::ui_system::*;
 use systems::combat_system::*;
 use systems::debug_visualization::*;
+use systems::debug_ui::GamePathLine;
 use systems::debug_ui::*;
+use systems::tower_ui::{
+    TowerSelectionState, 
+    setup_tower_placement_panel, 
+    setup_tower_upgrade_panel,
+    tower_selection_system,
+    tower_type_button_system,
+    upgrade_button_system,
+    update_upgrade_panel_system,
+    selected_tower_indicator_system,
+};
 
 fn main() {
     App::new()
@@ -33,17 +44,27 @@ fn main() {
         .init_resource::<MouseInputState>()
         .init_resource::<WaveStatus>()
         .init_resource::<DebugVisualizationState>()
+        .init_resource::<TowerSelectionState>()
         .insert_resource(create_default_path())
         // Setup systems
-        .add_systems(Startup, (setup, setup_placement_zones))
-        // Game systems
+        .add_systems(Startup, (setup, setup_placement_zones, setup_tower_placement_panel, setup_tower_upgrade_panel))
+        // Game systems - Split into groups to avoid tuple size limits
         .add_systems(Update, (
             // Input and UI systems
             mouse_input_system,
             tower_placement_system,
             tower_placement_preview_system,
             update_ui_system,
-            
+        ))
+        .add_systems(Update, (
+            // Tower UI systems
+            tower_selection_system,
+            tower_type_button_system,
+            upgrade_button_system,
+            update_upgrade_panel_system,
+            selected_tower_indicator_system,
+        ))
+        .add_systems(Update, (
             // Debug visualization systems
             debug_toggle_system,
             debug_visualization_system,
@@ -53,7 +74,8 @@ fn main() {
             projectile_spawning_system,
             projectile_movement_system,
             collision_system,
-            
+        ))
+        .add_systems(Update, (
             // Enemy and wave management
             manual_wave_system,
             enemy_spawning_system,
@@ -92,15 +114,18 @@ fn setup(mut commands: Commands) {
         let midpoint = (start + end) / 2.0;
         let length = start.distance(end);
         
-        commands.spawn(SpriteBundle {
-            sprite: Sprite {
-                color: Color::srgb(0.5, 0.5, 0.5),
-                custom_size: Some(Vec2::new(length, 5.0)),
+        commands.spawn((
+            SpriteBundle {
+                sprite: Sprite {
+                    color: Color::srgb(0.5, 0.5, 0.5),
+                    custom_size: Some(Vec2::new(length, 5.0)),
+                    ..default()
+                },
+                transform: Transform::from_translation(midpoint.extend(-1.0)),
                 ..default()
             },
-            transform: Transform::from_translation(midpoint.extend(-1.0)),
-            ..default()
-        });
+            GamePathLine,
+        ));
     }
 }
 

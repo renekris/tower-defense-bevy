@@ -1,9 +1,10 @@
 use bevy::prelude::*;
 
 /// Represents the current state of the game
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Resource)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Resource, Default)]
 pub enum GameState {
     /// Game is actively being played
+    #[default]
     Playing,
     /// Game is paused
     Paused,
@@ -11,10 +12,4 @@ pub enum GameState {
     GameOver,
     /// Player has won
     Victory,
-}
-
-impl Default for GameState {
-    fn default() -> Self {
-        GameState::Playing
-    }
 }

@@ -3,9 +3,10 @@ use crate::resources::EnemyPath;
 use crate::systems::input_system::PlacementZoneType;
 
 /// Represents the type of content in each grid cell
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum CellType {
     /// Empty cell - available for path routing or tower placement
+    #[default]
     Empty,
     /// Active path cell - enemies will traverse this cell
     Path,
@@ -13,12 +14,6 @@ pub enum CellType {
     TowerZone,
     /// Blocked cell - impassable obstacle
     Blocked,
-}
-
-impl Default for CellType {
-    fn default() -> Self {
-        CellType::Empty
-    }
 }
 
 /// Grid position using integer coordinates

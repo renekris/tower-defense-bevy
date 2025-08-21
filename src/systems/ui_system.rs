@@ -11,7 +11,7 @@ pub struct TowerSelectionUI;
 pub fn update_ui_system(
     mut commands: Commands,
     economy: Res<Economy>,
-    mouse_state: Res<MouseInputState>,
+    _mouse_state: Res<MouseInputState>,
     mut economy_ui_query: Query<(Entity, &mut Text), (With<EconomyUI>, Without<TowerSelectionUI>)>,
     mut selection_ui_query: Query<(Entity, &mut Text), (With<TowerSelectionUI>, Without<EconomyUI>)>,
 ) {
@@ -42,16 +42,8 @@ pub fn update_ui_system(
         ));
     }
 
-    // Update or create tower selection UI
-    let selection_text = if let Some(tower_type) = mouse_state.selected_tower_type {
-        let cost = tower_type.get_cost();
-        format!(
-            "Selected: {:?} | Cost: ${}  R:{} M:{} E:{}",
-            tower_type, cost.money, cost.research_points, cost.materials, cost.energy
-        )
-    } else {
-        "No tower selected. Press 1-5 to select tower type.".to_string()
-    };
+    // Update or create tower selection UI - now handled by tower UI panels
+    let selection_text = "Use UI panels to select towers and upgrades".to_string();
 
     if let Ok((_, mut text)) = selection_ui_query.get_single_mut() {
         text.sections[0].value = selection_text;
