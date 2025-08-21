@@ -98,6 +98,13 @@ impl WaveManager {
     pub fn enemy_spawned(&mut self) {
         self.enemies_spawned += 1;
     }
+
+    /// Update the spawn rate (higher values = faster spawning)
+    /// spawn_rate: 0.5 = slow (2 second intervals), 1.0 = normal (1 second), 3.0 = fast (0.33 seconds)
+    pub fn set_spawn_rate(&mut self, spawn_rate: f32) {
+        let spawn_interval = 1.0 / spawn_rate.max(0.1); // Prevent division by zero/negative
+        self.spawn_timer.set_duration(std::time::Duration::from_secs_f32(spawn_interval));
+    }
 }
 
 impl Default for WaveManager {

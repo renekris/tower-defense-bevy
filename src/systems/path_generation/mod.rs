@@ -34,6 +34,28 @@ pub fn generate_level_path(wave_number: u32) -> EnemyPath {
     grid.to_enemy_path(grid_path)
 }
 
+/// Generate level path with custom UI parameters
+/// 
+/// # Arguments
+/// * `wave_number` - Current wave number for seed generation
+/// * `custom_obstacle_density` - Override obstacle density (0.0-0.5)
+/// 
+/// # Returns
+/// * `EnemyPath` - Compatible with existing enemy movement system
+pub fn generate_level_path_with_params(wave_number: u32, custom_obstacle_density: f32) -> EnemyPath {
+    let seed = wave_number as u64 * 12345 + 67890; // Deterministic but varied
+    
+    // Generate the grid-based map with custom obstacle density
+    let grid = generate_procedural_map_with_density(seed, custom_obstacle_density);
+    
+    // Find optimal path through the generated obstacles
+    let grid_path = find_path(&grid, grid.entry_point, grid.exit_point)
+        .expect("Generated map must have valid path");
+    
+    // Convert to world coordinates for enemy movement
+    grid.to_enemy_path(grid_path)
+}
+
 /// Generate placement zones optimized for the given wave
 /// 
 /// # Arguments  
