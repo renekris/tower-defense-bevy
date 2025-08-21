@@ -6,6 +6,11 @@ mod systems;
 
 use resources::*;
 use systems::enemy_system::*;
+use systems::input_system::*;
+use systems::ui_system::*;
+use systems::combat_system::*;
+use systems::debug_visualization::*;
+use systems::debug_ui::*;
 
 fn main() {
     App::new()
@@ -18,19 +23,46 @@ fn main() {
             }),
             ..default()
         }))
+        // Add custom plugins
+        .add_plugins(DebugUIPlugin)
         // Initialize game resources
         .init_resource::<Score>()
         .init_resource::<WaveManager>()
         .init_resource::<GameState>()
+        .init_resource::<Economy>()
+        .init_resource::<MouseInputState>()
+        .init_resource::<WaveStatus>()
+        .init_resource::<DebugVisualizationState>()
         .insert_resource(create_default_path())
         // Setup systems
-        .add_systems(Startup, setup)
+        .add_systems(Startup, (setup, setup_placement_zones))
         // Game systems
         .add_systems(Update, (
+            // Input and UI systems
+            mouse_input_system,
+            tower_placement_system,
+            tower_placement_preview_system,
+            update_ui_system,
+            
+            // Debug visualization systems
+            debug_toggle_system,
+            debug_visualization_system,
+            
+            // Combat systems (ORDER CRITICAL - dependency chain)
+            tower_targeting_system,
+            projectile_spawning_system,
+            projectile_movement_system,
+            collision_system,
+            
+            // Enemy and wave management
             manual_wave_system,
             enemy_spawning_system,
             enemy_movement_system,
             enemy_cleanup_system,
+            
+            // Game state management (runs last)
+            game_state_system,
+            
             close_on_esc,
         ))
         .run();
@@ -41,14 +73,14 @@ fn setup(mut commands: Commands) {
     
     commands.spawn(Text2dBundle {
         text: Text::from_section(
-            "Tower Defense Game - Phase 1\nPress SPACE to spawn wave\nPress ESC to exit",
+            "Tower Defense Game - Phase 3 COMBAT!\nSPACE: spawn wave | ESC: exit\n1-5: select tower type | LEFT CLICK: place tower\nF1: toggle debug visualization | F2: debug UI panel | 1-9: select wave (debug mode)\nTowers auto-target and shoot enemies! Defend the base!",
             TextStyle {
-                font_size: 30.0,
+                font_size: 20.0,
                 color: Color::srgb(1.0, 1.0, 1.0),
                 ..default()
             },
         ),
-        transform: Transform::from_translation(Vec3::new(0.0, 300.0, 0.0)),
+        transform: Transform::from_translation(Vec3::new(0.0, 330.0, 0.0)),
         ..default()
     });
 
