@@ -201,7 +201,7 @@ fn render_grid(
 fn render_path(
     commands: &mut Commands,
     enemy_path: &EnemyPath,
-    grid: &PathGrid,
+    _grid: &PathGrid,
 ) {
     // Draw waypoints as small circles
     for (i, &waypoint) in enemy_path.waypoints.iter().enumerate() {

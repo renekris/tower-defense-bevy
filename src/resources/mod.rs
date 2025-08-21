@@ -8,4 +8,5 @@ pub use game_state::*;
 pub use wave_manager::*;
 pub use score::*;
 pub use economy::*;
-pub use path_generation::*;
+// Re-export only specific types from path_generation to avoid namespace conflicts
+pub use path_generation::{PathGenerationConfig, PathGenerationState};

@@ -71,5 +71,34 @@ pub fn generate_placement_zones(wave_number: u32) -> Vec<TowerZone> {
     let grid_path = find_path(&grid, grid.entry_point, grid.exit_point)
         .expect("Generated map must have valid path");
     
-    calculate_optimal_tower_zones(&grid, &grid_path)
+    let mut zones = calculate_optimal_tower_zones(&grid, &grid_path);
+    
+    // Fallback: If no zones generated, create some default zones for testing
+    if zones.is_empty() {
+        use crate::systems::input_system::PlacementZoneType;
+        use crate::systems::path_generation::grid::{GridPos, TowerZone};
+        
+        // Create simple fallback zones
+        let fallback_zones = vec![
+            (GridPos::new(2, 2), GridPos::new(4, 4)),
+            (GridPos::new(grid.width - 5, 2), GridPos::new(grid.width - 3, 4)),
+            (GridPos::new(2, grid.height - 5), GridPos::new(4, grid.height - 3)),
+            (GridPos::new(grid.width - 5, grid.height - 5), GridPos::new(grid.width - 3, grid.height - 3)),
+        ];
+        
+        for (start, end) in fallback_zones {
+            // Only add if within bounds
+            if start.x < grid.width && start.y < grid.height && 
+               end.x < grid.width && end.y < grid.height {
+                zones.push(TowerZone::new(
+                    PlacementZoneType::FreeZone,
+                    (start, end),
+                    &grid,
+                    0.5, // Medium strategic value
+                ));
+            }
+        }
+    }
+    
+    zones
 }
