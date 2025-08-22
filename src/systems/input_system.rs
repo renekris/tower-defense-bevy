@@ -5,6 +5,9 @@ use crate::resources::*;
 use crate::components::*;
 use crate::systems::combat_system::Target;
 use crate::systems::tower_ui::TowerSelectionState;
+use crate::systems::tower_rendering::spawn_tower_with_pattern;
+use crate::systems::unified_grid::{UnifiedGridSystem, GridVisualizationMode, snap_to_grid, world_to_grid};
+use crate::systems::obstacle_rendering::ObstacleGrid;
 
 #[derive(Resource, Debug)]
 pub struct MouseInputState {
@@ -92,7 +95,7 @@ pub fn mouse_input_system(
     }
 }
 
-/// Tower placement system - Re-enabled with proper dependencies
+/// Tower placement system - Enhanced with obstacle collision detection
 pub fn tower_placement_system(
     mut commands: Commands,
     mouse_state: Res<MouseInputState>,
@@ -100,24 +103,35 @@ pub fn tower_placement_system(
     mut economy: ResMut<Economy>,
     existing_towers: Query<&Transform, With<TowerStats>>,
     enemy_path: Res<EnemyPath>,
+    ui_interaction_query: Query<&Interaction, With<Button>>,
+    unified_grid: Res<UnifiedGridSystem>,
+    obstacle_grid: Res<ObstacleGrid>,
 ) {
+    // CRITICAL SAFETY CHECK: Don't place towers if any UI button is being interacted with
+    let ui_is_active = ui_interaction_query.iter().any(|interaction| {
+        matches!(*interaction, Interaction::Pressed | Interaction::Hovered)
+    });
+    
     // Only attempt placement if we have a tower type selected and left click
-    // AND we're in placement mode (not upgrade mode)
-    if tower_selection_state.is_placement_mode() {
+    // AND we're in placement mode (not upgrade mode) AND no UI is being interacted with
+    if tower_selection_state.is_placement_mode() && !ui_is_active {
         if let Some(tower_type) = tower_selection_state.selected_placement_type {
             if mouse_state.left_clicked {
                 println!("Attempting to place {:?} at {:?}", tower_type, mouse_state.world_position);
                 let placement_pos = get_placement_position(
                     mouse_state.world_position,
                     mouse_state.placement_mode,
+                    &unified_grid,
                 );
 
-                // Validate placement
-                if is_valid_tower_placement(
+                // Validate placement using unified system (ensures consistency with red areas)
+                if is_valid_tower_placement_unified(
                     placement_pos,
                     &existing_towers,
                     &enemy_path.waypoints,
-                    32.0, // Tower size
+                    &unified_grid,
+                    Some(&obstacle_grid.grid),
+                    40.0, // Tower size - exactly one grid cell
                 ) {
                     let cost = tower_type.get_cost();
                     if economy.can_afford(&cost) {
@@ -136,7 +150,7 @@ pub fn tower_placement_system(
     }
 }
 
-/// Preview system for tower placement - Re-enabled with proper dependencies
+/// Preview system for tower placement - Enhanced with obstacle collision detection
 pub fn tower_placement_preview_system(
     mut commands: Commands,
     mouse_state: Res<MouseInputState>,
@@ -145,6 +159,8 @@ pub fn tower_placement_preview_system(
     economy: Res<Economy>,
     existing_towers: Query<&Transform, With<TowerStats>>,
     enemy_path: Res<EnemyPath>,
+    unified_grid: Res<UnifiedGridSystem>,
+    obstacle_grid: Res<ObstacleGrid>,
 ) {
     // Clear existing previews
     for entity in existing_previews.iter() {
@@ -157,13 +173,16 @@ pub fn tower_placement_preview_system(
             let placement_pos = get_placement_position(
                 mouse_state.world_position,
                 mouse_state.placement_mode,
+                &unified_grid,
             );
 
-            let is_valid = is_valid_tower_placement(
+            let is_valid = is_valid_tower_placement_unified(
                 placement_pos,
                 &existing_towers,
                 &enemy_path.waypoints,
-                32.0,
+                &unified_grid,
+                Some(&obstacle_grid.grid),
+                40.0, // Tower size - exactly one grid cell
             );
 
             let cost = tower_type.get_cost();
@@ -178,7 +197,7 @@ pub fn tower_placement_preview_system(
             commands.spawn((
                 Sprite {
                     color,
-                    custom_size: Some(Vec2::new(32.0, 32.0)),
+                    custom_size: Some(Vec2::new(40.0, 40.0)), // Exactly one grid cell
                     ..default()
                 },
                 Transform::from_translation(placement_pos.extend(1.0)),
@@ -210,22 +229,24 @@ pub fn screen_to_world_position(
     camera_transform.translation().truncate() + ndc * window_size * 0.5
 }
 
-pub fn snap_to_grid(position: Vec2, grid_size: f32) -> Vec2 {
-    Vec2::new(
-        (position.x / grid_size).floor() * grid_size,
-        (position.y / grid_size).floor() * grid_size,
-    )
-}
-
-pub fn get_placement_position(world_pos: Vec2, mode: PlacementMode) -> Vec2 {
+pub fn get_placement_position(
+    world_pos: Vec2,
+    mode: PlacementMode,
+    unified_grid: &UnifiedGridSystem,
+) -> Vec2 {
     match mode {
-        PlacementMode::GridBased => snap_to_grid(world_pos, 64.0),
+        PlacementMode::GridBased => snap_to_grid(world_pos, unified_grid),
         PlacementMode::FreeForm => world_pos,
         PlacementMode::Hybrid => {
-            if is_in_grid_zone(world_pos) {
-                snap_to_grid(world_pos, 64.0)
+            // Use unified grid to determine if we're in a valid placement area
+            if let Some(grid_pos) = world_to_grid(world_pos, unified_grid) {
+                if is_valid_grid_placement(grid_pos, unified_grid) {
+                    snap_to_grid(world_pos, unified_grid)
+                } else {
+                    world_pos // Free zone or fallback
+                }
             } else {
-                world_pos // Free zone or fallback
+                world_pos
             }
         }
         PlacementMode::None => world_pos,
@@ -236,6 +257,19 @@ pub fn is_in_grid_zone(position: Vec2) -> bool {
     // Left or right grid zones 
     (position.x >= -400.0 && position.x <= -200.0 && position.y.abs() <= 200.0) ||
     (position.x >= 200.0 && position.x <= 400.0 && position.y.abs() <= 200.0)
+}
+
+/// Check if a grid position is valid for tower placement using unified grid logic
+/// This function now delegates to the path grid system for consistent validation
+pub fn is_valid_grid_placement(grid_pos: crate::systems::path_generation::grid::GridPos, unified_grid: &UnifiedGridSystem) -> bool {
+    // Check bounds
+    if grid_pos.x >= unified_grid.grid_width || grid_pos.y >= unified_grid.grid_height {
+        return false;
+    }
+    
+    // Always allow placement - let the PathGrid system handle the actual restrictions
+    // This ensures consistency with the unified validation system
+    true
 }
 
 pub fn is_in_free_zone(position: Vec2) -> bool {
@@ -268,10 +302,106 @@ pub fn is_valid_tower_placement(
         return false;
     }
 
-    // Check overlap with existing towers
+    // Check overlap with existing towers - use full tower size for collision
     for transform in existing_towers.iter() {
         let distance = position.distance(transform.translation.truncate());
         if distance < tower_size {
+            return false;
+        }
+    }
+
+    true
+}
+
+/// Enhanced tower placement validation that includes obstacle collision
+pub fn is_valid_tower_placement_with_obstacles(
+    position: Vec2,
+    existing_towers: &Query<&Transform, With<TowerStats>>,
+    path_points: &[Vec2],
+    obstacle_grid: &crate::systems::path_generation::PathGrid,
+    tower_size: f32,
+) -> bool {
+    // Check basic placement validity (path and existing towers)
+    if !is_valid_tower_placement(position, existing_towers, path_points, tower_size) {
+        return false;
+    }
+
+    // Check obstacle collision
+    if let Some(grid_pos) = obstacle_grid.world_to_grid(position) {
+        // Check if the tower position overlaps with any obstacle
+        if !obstacle_grid.is_traversable(grid_pos) {
+            return false;
+        }
+        
+        // Check surrounding cells for obstacle collision (tower occupies full cell)
+        let neighbors = grid_pos.neighbors(obstacle_grid.width, obstacle_grid.height);
+        for neighbor in neighbors {
+            let neighbor_world = obstacle_grid.grid_to_world(neighbor);
+            let distance = position.distance(neighbor_world);
+            
+            // If neighbor obstacle is too close to tower center
+            if distance < tower_size * 0.7 && !obstacle_grid.is_traversable(neighbor) {
+                return false;
+            }
+        }
+    }
+
+    true
+}
+
+/// Unified tower placement validation that uses the same logic as grid visualization
+/// This ensures consistency between red areas and actual placement blocking
+pub fn is_valid_tower_placement_unified(
+    position: Vec2,
+    existing_towers: &Query<&Transform, With<TowerStats>>,
+    path_points: &[Vec2],
+    unified_grid: &UnifiedGridSystem,
+    obstacle_grid: Option<&crate::systems::path_generation::PathGrid>,
+    tower_size: f32,
+) -> bool {
+    // First check if this is within unified grid bounds
+    if let Some(grid_pos) = crate::systems::unified_grid::world_to_grid(position, unified_grid) {
+        // Use the PathGrid system for placement validation if available
+        if let Some(path_grid) = obstacle_grid {
+            match path_grid.get_cell(grid_pos) {
+                Some(crate::systems::path_generation::grid::CellType::Empty) => {
+                    // Allow placement on empty cells
+                },
+                Some(crate::systems::path_generation::grid::CellType::TowerZone) => {
+                    // Allow placement on designated tower zones
+                },
+                Some(crate::systems::path_generation::grid::CellType::Path) => {
+                    // Prevent placement on path cells
+                    return false;
+                },
+                Some(crate::systems::path_generation::grid::CellType::Blocked) => {
+                    // Prevent placement on blocked cells (obstacles)
+                    return false;
+                },
+                None => {
+                    // Allow placement outside PathGrid bounds (fallback behavior)
+                }
+            }
+        }
+    } else {
+        // Outside unified grid bounds
+        return false;
+    }
+    
+    // Check existing tower overlaps - use full tower size for collision
+    for transform in existing_towers.iter() {
+        let distance = position.distance(transform.translation.truncate());
+        if distance < tower_size {
+            return false;
+        }
+    }
+    
+    // Check distance to path segments (additional safety check)
+    for i in 0..path_points.len().saturating_sub(1) {
+        let start = path_points[i];
+        let end = path_points[i + 1];
+        let distance = distance_to_line_segment(position, start, end);
+        if distance < tower_size / 2.0 {
             return false;
         }
     }
@@ -293,27 +423,8 @@ pub fn distance_to_line_segment(point: Vec2, line_start: Vec2, line_end: Vec2) -
 }
 
 pub fn spawn_tower(commands: &mut Commands, position: Vec2, tower_type: TowerType) {
-    let tower_stats = TowerStats::new(tower_type);
-    let color = match tower_type {
-        TowerType::Basic => Color::srgb(0.5, 0.3, 0.1),
-        TowerType::Advanced => Color::srgb(0.3, 0.3, 0.7),
-        TowerType::Laser => Color::srgb(1.0, 0.2, 0.2),
-        TowerType::Missile => Color::srgb(0.8, 0.8, 0.1),
-        TowerType::Tesla => Color::srgb(0.5, 0.0, 1.0),
-    };
-
-    commands.spawn((
-        Sprite {
-            color,
-            custom_size: Some(Vec2::new(32.0, 32.0)),
-            ..default()
-        },
-        Transform::from_translation(position.extend(0.0)),
-        tower_stats,
-        Health::new(100.0),
-        GamePosition::new(position.x, position.y),
-        Target::default(), // Enable targeting for this tower
-    ));
+    // Use the new pattern-based tower spawning system
+    spawn_tower_with_pattern(commands, position, tower_type);
 }
 
 pub fn spawn_range_preview(commands: &mut Commands, position: Vec2, tower_type: TowerType) {
@@ -331,139 +442,24 @@ pub fn spawn_range_preview(commands: &mut Commands, position: Vec2, tower_type: 
     ));
 }
 
-// System to setup placement zones - MUCH SIMPLER APPROACH
-pub fn setup_placement_zones(mut commands: Commands) {
-    // Create large zone indicator rectangles instead of lots of small squares
-    // Made much more visible with higher opacity and positive Z values
-    
-    // Left grid zone (bright green rectangle)
-    commands.spawn((
-        Sprite {
-            color: Color::srgba(0.0, 1.0, 0.0, 0.3), // Much more visible
-            custom_size: Some(Vec2::new(200.0, 400.0)),
-            ..default()
-        },
-        Transform::from_translation(Vec3::new(-300.0, 0.0, 0.5)), // Positive Z
-        PlacementZoneMarker {
-            zone_type: PlacementZoneType::GridZone,
-        },
-    ));
-    
-    // Right grid zone (bright green rectangle) 
-    commands.spawn((
-        Sprite {
-            color: Color::srgba(0.0, 1.0, 0.0, 0.3), // Much more visible
-            custom_size: Some(Vec2::new(200.0, 400.0)),
-            ..default()
-        },
-        Transform::from_translation(Vec3::new(300.0, 0.0, 0.5)), // Positive Z
-        PlacementZoneMarker {
-            zone_type: PlacementZoneType::GridZone,
-        },
-    ));
-    
-    // Top free zone (bright blue rectangle)
-    commands.spawn((
-        Sprite {
-            color: Color::srgba(0.0, 0.0, 1.0, 0.25), // Much more visible
-            custom_size: Some(Vec2::new(600.0, 150.0)),
-            ..default()
-        },
-        Transform::from_translation(Vec3::new(0.0, 200.0, 0.5)), // Positive Z
-        PlacementZoneMarker {
-            zone_type: PlacementZoneType::FreeZone,
-        },
-    ));
-    
-    // Bottom free zone (bright blue rectangle)
-    commands.spawn((
-        Sprite {
-            color: Color::srgba(0.0, 0.0, 1.0, 0.25), // Much more visible
-            custom_size: Some(Vec2::new(600.0, 150.0)),
-            ..default()
-        },
-        Transform::from_translation(Vec3::new(0.0, -200.0, 0.5)), // Positive Z
-        PlacementZoneMarker {
-            zone_type: PlacementZoneType::FreeZone,
-        },
-    ));
-    
-    // Add grid lines and boundaries for the grid zones to show snapping points
-    add_grid_lines_with_borders(&mut commands, Vec2::new(-300.0, 0.0), Vec2::new(200.0, 400.0), 64.0);
-    add_grid_lines_with_borders(&mut commands, Vec2::new(300.0, 0.0), Vec2::new(200.0, 400.0), 64.0);
-}
+// Legacy placement zones removed - now handled by unified grid system
 
-// Helper function to add visual grid lines with borders and separation
-fn add_grid_lines_with_borders(commands: &mut Commands, center: Vec2, size: Vec2, grid_size: f32) {
-    let half_width = size.x / 2.0;
-    let half_height = size.y / 2.0;
+// Legacy grid line helper removed - now handled by unified grid system
+
+/// System to automatically switch grid visualization mode based on tower selection
+pub fn auto_grid_mode_system(
+    tower_selection_state: Res<TowerSelectionState>,
+    mut unified_grid: ResMut<UnifiedGridSystem>,
+) {
+    // Switch to placement mode when a tower type is selected for placement
+    let desired_mode = if tower_selection_state.is_placement_mode() && tower_selection_state.selected_placement_type.is_some() {
+        GridVisualizationMode::Placement
+    } else {
+        GridVisualizationMode::Normal
+    };
     
-    // Add thick border lines around the entire grid zone
-    // Top border
-    commands.spawn((
-        Sprite {
-            color: Color::srgba(1.0, 1.0, 1.0, 0.6),
-            custom_size: Some(Vec2::new(size.x + 4.0, 3.0)),
-            ..default()
-        },
-        Transform::from_translation(Vec3::new(center.x, center.y + half_height, 0.7)),
-    ));
-    
-    // Bottom border
-    commands.spawn((
-        Sprite {
-            color: Color::srgba(1.0, 1.0, 1.0, 0.6),
-            custom_size: Some(Vec2::new(size.x + 4.0, 3.0)),
-            ..default()
-        },
-        Transform::from_translation(Vec3::new(center.x, center.y - half_height, 0.7)),
-    ));
-    
-    // Left border
-    commands.spawn((
-        Sprite {
-            color: Color::srgba(1.0, 1.0, 1.0, 0.6),
-            custom_size: Some(Vec2::new(3.0, size.y + 4.0)),
-            ..default()
-        },
-        Transform::from_translation(Vec3::new(center.x - half_width, center.y, 0.7)),
-    ));
-    
-    // Right border
-    commands.spawn((
-        Sprite {
-            color: Color::srgba(1.0, 1.0, 1.0, 0.6),
-            custom_size: Some(Vec2::new(3.0, size.y + 4.0)),
-            ..default()
-        },
-        Transform::from_translation(Vec3::new(center.x + half_width, center.y, 0.7)),
-    ));
-    
-    // Internal vertical grid lines
-    let mut x = -half_width + grid_size;
-    while x < half_width {
-        commands.spawn((
-            Sprite {
-                color: Color::srgba(1.0, 1.0, 1.0, 0.3),
-                custom_size: Some(Vec2::new(1.0, size.y)),
-                ..default()
-            },
-            Transform::from_translation(Vec3::new(center.x + x, center.y, 0.6)),
-        ));
-        x += grid_size;
-    }
-    
-    // Internal horizontal grid lines  
-    let mut y = -half_height + grid_size;
-    while y < half_height {
-        commands.spawn((
-            Sprite {
-                color: Color::srgba(1.0, 1.0, 1.0, 0.3),
-                custom_size: Some(Vec2::new(size.x, 1.0)),
-                ..default()
-            },
-            Transform::from_translation(Vec3::new(center.x, center.y + y, 0.6)),
-        ));
-        y += grid_size;
+    // Only update if mode needs to change to avoid triggering change detection unnecessarily
+    if unified_grid.mode != desired_mode {
+        unified_grid.mode = desired_mode;
     }
 }
