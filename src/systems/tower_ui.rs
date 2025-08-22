@@ -2,6 +2,7 @@ use bevy::prelude::*;
 use crate::resources::*;
 use crate::components::*;
 use crate::systems::input_system::MouseInputState;
+use crate::systems::enemy_system::StartWaveEvent;
 
 // ============================================================================
 // UI COLOR CONSTANTS
@@ -91,6 +92,44 @@ impl Default for TowerSelectionState {
     }
 }
 
+/// Resource to manage tower stat popup state
+#[derive(Resource, Debug)]
+pub struct TowerStatPopupState {
+    /// Currently displayed tower type in popup (None = hidden)
+    pub active_tower_type: Option<TowerType>,
+    /// Position where the popup should appear
+    pub position: Vec2,
+    /// Whether popup is visible
+    pub visible: bool,
+}
+
+impl Default for TowerStatPopupState {
+    fn default() -> Self {
+        Self {
+            active_tower_type: None,
+            position: Vec2::new(300.0, 200.0),
+            visible: false,
+        }
+    }
+}
+
+impl TowerStatPopupState {
+    pub fn show_for_tower(&mut self, tower_type: TowerType, position: Vec2) {
+        self.active_tower_type = Some(tower_type);
+        self.position = position;
+        self.visible = true;
+    }
+
+    pub fn hide(&mut self) {
+        self.active_tower_type = None;
+        self.visible = false;
+    }
+
+    pub fn is_showing(&self) -> bool {
+        self.visible && self.active_tower_type.is_some()
+    }
+}
+
 impl TowerSelectionState {
     pub fn set_placement_mode(&mut self, tower_type: Option<TowerType>) {
         self.mode = TowerUIMode::Placement;
@@ -160,6 +199,36 @@ pub struct SelectedTowerIndicator;
 #[derive(Component)]
 pub struct TowerTooltip;
 
+/// Component for tower stat popup
+#[derive(Component)]
+pub struct TowerStatPopup;
+
+/// Component for popup trigger linking tower buttons to popups
+#[derive(Component)]
+pub struct PopupTrigger {
+    pub tower_type: TowerType,
+}
+
+/// Component for popup content sections
+#[derive(Component)]
+pub struct PopupHeader;
+
+#[derive(Component)]
+pub struct PopupStatsSection;
+
+#[derive(Component)]
+pub struct PopupCostSection;
+
+#[derive(Component)]
+pub struct PopupDescriptionSection;
+
+#[derive(Component)]
+pub struct PopupUpgradeSection;
+
+/// Component for popup close button
+#[derive(Component)]
+pub struct PopupCloseButton;
+
 /// Component for resource status display
 #[derive(Component)]
 pub struct ResourceStatus;
@@ -171,16 +240,34 @@ pub struct HoverState {
     pub tower_type: TowerType,
 }
 
+/// Component for the Start Wave button
+#[derive(Component)]
+pub struct StartWaveButton;
+
+/// Component for the Start Wave button text (for updates)
+#[derive(Component)]
+pub struct StartWaveButtonText;
+
 // ============================================================================
 // UI SYSTEMS
 // ============================================================================
 
-/// System to handle tower clicking for upgrade selection
+/// System to handle tower clicking for upgrade selection with right-click unselection
 pub fn tower_selection_system(
     mut selection_state: ResMut<TowerSelectionState>,
     mouse_input: Res<MouseInputState>,
+    mouse_button_input: Res<ButtonInput<MouseButton>>,
     towers_query: Query<(Entity, &Transform), With<TowerStats>>,
 ) {
+    // Handle right-click unselection
+    if mouse_button_input.just_pressed(MouseButton::Right) {
+        if selection_state.selected_placement_type.is_some() || selection_state.selected_tower_entity.is_some() {
+            selection_state.clear_selection();
+            println!("Right-click: Cleared all tower selections");
+        }
+        return; // Exit early to prevent left-click processing
+    }
+
     if mouse_input.left_clicked {
         // Check if we clicked on a tower
         let click_pos = mouse_input.world_position;
@@ -214,39 +301,92 @@ pub fn tower_selection_system(
     // TODO: This will be moved to the input system or removed when keyboard controls are removed
 }
 
-/// System to handle tower type button clicks with enhanced styling
+/// System to handle tower type button clicks with enhanced styling and popup triggers
 pub fn tower_type_button_system(
     mut selection_state: ResMut<TowerSelectionState>,
-    mut interaction_query: Query<
-        (&Interaction, &TowerTypeButton, &mut BackgroundColor, &mut BorderColor, &mut HoverState),
-        (Changed<Interaction>, With<Button>),
-    >,
+    mut popup_state: ResMut<TowerStatPopupState>,
+    mut mouse_input_state: ResMut<MouseInputState>,
+    mouse_button_input: Res<ButtonInput<MouseButton>>,
+    mut button_queries: ParamSet<(
+        // Query for handling interactions (Changed<Interaction>)
+        Query<
+            (&Interaction, &TowerTypeButton, &mut BackgroundColor, &mut BorderColor, &mut HoverState, &GlobalTransform),
+            (Changed<Interaction>, With<Button>),
+        >,
+        // Query for updating all buttons when selection state changes
+        Query<
+            (&TowerTypeButton, &mut BackgroundColor, &mut BorderColor, &HoverState),
+            With<Button>,
+        >,
+    )>,
 ) {
-    for (interaction, tower_button, mut bg_color, mut border_color, mut hover_state) in interaction_query.iter_mut() {
-        let is_selected = Some(tower_button.tower_type) == selection_state.selected_placement_type;
-        
-        match *interaction {
-            Interaction::Pressed => {
-                selection_state.set_placement_mode(Some(tower_button.tower_type));
-                *bg_color = UIColors::BUTTON_SELECTED.into();
-                *border_color = UIColors::BORDER_SELECTED.into();
-                println!("Selected tower type: {:?}", tower_button.tower_type);
+    // First, handle button interactions using the first query
+    {
+        let mut interaction_query = button_queries.p0();
+        for (interaction, tower_button, mut bg_color, mut border_color, mut hover_state, global_transform) in interaction_query.iter_mut() {
+            let is_selected = Some(tower_button.tower_type) == selection_state.selected_placement_type;
+            
+            match *interaction {
+                Interaction::Pressed => {
+                    // Check which mouse button was pressed
+                    if mouse_button_input.pressed(MouseButton::Left) {
+                        // Left click: Select tower for placement (existing functionality)
+                        mouse_input_state.left_clicked = false;
+                        selection_state.set_placement_mode(Some(tower_button.tower_type));
+                        *bg_color = UIColors::BUTTON_SELECTED.into();
+                        *border_color = UIColors::BORDER_SELECTED.into();
+                        println!("Selected tower type: {:?}", tower_button.tower_type);
+                    } else if mouse_button_input.pressed(MouseButton::Right) {
+                        // Right click: Show stat popup
+                        let button_pos = global_transform.translation().truncate();
+                        // Position popup to the left of the button to avoid UI overlap
+                        let popup_pos = Vec2::new(button_pos.x - 320.0, button_pos.y);
+                        popup_state.show_for_tower(tower_button.tower_type, popup_pos);
+                        println!("Showing stat popup for tower: {:?}", tower_button.tower_type);
+                    }
+                }
+                Interaction::Hovered => {
+                    hover_state.is_hovered = true;
+                    if is_selected {
+                        *bg_color = UIColors::BUTTON_SELECTED_HOVER.into();
+                        *border_color = UIColors::BORDER_SELECTED_HOVER.into();
+                    } else {
+                        *bg_color = UIColors::BUTTON_HOVER.into();
+                        *border_color = UIColors::BORDER_HOVER.into();
+                    }
+                }
+                Interaction::None => {
+                    hover_state.is_hovered = false;
+                    if is_selected {
+                        *bg_color = UIColors::BUTTON_SELECTED.into();
+                        *border_color = UIColors::BORDER_SELECTED.into();
+                    } else {
+                        *bg_color = UIColors::BUTTON_DEFAULT.into();
+                        *border_color = UIColors::BORDER_DEFAULT.into();
+                    }
+                }
             }
-            Interaction::Hovered => {
-                hover_state.is_hovered = true;
-                if is_selected {
+        }
+    }
+
+    // Then, update ALL buttons when selection state changes using the second query
+    if selection_state.is_changed() {
+        let mut all_buttons_query = button_queries.p1();
+        for (tower_button, mut bg_color, mut border_color, hover_state) in all_buttons_query.iter_mut() {
+            let is_selected = Some(tower_button.tower_type) == selection_state.selected_placement_type;
+            
+            if is_selected {
+                if hover_state.is_hovered {
                     *bg_color = UIColors::BUTTON_SELECTED_HOVER.into();
                     *border_color = UIColors::BORDER_SELECTED_HOVER.into();
                 } else {
-                    *bg_color = UIColors::BUTTON_HOVER.into();
-                    *border_color = UIColors::BORDER_HOVER.into();
-                }
-            }
-            Interaction::None => {
-                hover_state.is_hovered = false;
-                if is_selected {
                     *bg_color = UIColors::BUTTON_SELECTED.into();
                     *border_color = UIColors::BORDER_SELECTED.into();
+                }
+            } else {
+                if hover_state.is_hovered {
+                    *bg_color = UIColors::BUTTON_HOVER.into();
+                    *border_color = UIColors::BORDER_HOVER.into();
                 } else {
                     *bg_color = UIColors::BUTTON_DEFAULT.into();
                     *border_color = UIColors::BORDER_DEFAULT.into();
@@ -260,6 +400,7 @@ pub fn tower_type_button_system(
 pub fn upgrade_button_system(
     selection_state: ResMut<TowerSelectionState>,
     mut economy: ResMut<Economy>,
+    mut mouse_input_state: ResMut<MouseInputState>,
     mut interaction_query: Query<
         (&Interaction, &mut BackgroundColor),
         (Changed<Interaction>, With<UpgradeButton>),
@@ -268,6 +409,9 @@ pub fn upgrade_button_system(
 ) {
     for (interaction, mut color) in interaction_query.iter_mut() {
         if *interaction == Interaction::Pressed {
+            // CRITICAL FIX: Consume the mouse click to prevent tower placement
+            mouse_input_state.left_clicked = false;
+            
             if let Some(tower_entity) = selection_state.selected_tower_entity {
                 if let Ok(mut tower_stats) = towers_query.get_mut(tower_entity) {
                     let upgrade_cost = tower_stats.get_upgrade_cost();
@@ -407,18 +551,47 @@ pub fn setup_tower_placement_panel(mut commands: Commands) {
                     ResourceStatusText,
                 ));
             });
+
+            // Start Wave button at the bottom
+            parent.spawn((
+                Button,
+                Node {
+                    width: Val::Percent(100.0),
+                    height: Val::Px(40.0),
+                    justify_content: JustifyContent::Center,
+                    align_items: AlignItems::Center,
+                    border: UiRect::all(Val::Px(2.0)),
+                    margin: UiRect::top(Val::Px(10.0)),
+                    ..default()
+                },
+                BackgroundColor(UIColors::BUTTON_DEFAULT),
+                BorderColor(UIColors::BORDER_DEFAULT),
+                BorderRadius::all(Val::Px(6.0)),
+                StartWaveButton,
+            )).with_children(|button| {
+                button.spawn((
+                    Text::new("START WAVE"),
+                    TextFont {
+                        font_size: 16.0,
+                        ..default()
+                    },
+                    TextColor(UIColors::TEXT_PRIMARY),
+                    StartWaveButtonText,
+                ));
+            });
         });
 
-    // Create enhanced tooltip container with better styling
+    // Create enhanced tooltip container with better styling and proper Z-order
     commands.spawn((
         Node {
             position_type: PositionType::Absolute,
             display: Display::None,
-            width: Val::Px(220.0),  // Wider for better readability
+            width: Val::Px(250.0),  // Wider for better readability
             padding: UiRect::all(Val::Px(12.0)),  // More generous padding
             border: UiRect::all(Val::Px(2.0)),  // Thicker border for definition
             flex_direction: FlexDirection::Column,
-            row_gap: Val::Px(4.0),  // Better vertical spacing
+            row_gap: Val::Px(6.0),  // Better vertical spacing
+            // Note: Z-index handled through spawn order in Bevy 0.14
             ..default()
         },
         BackgroundColor(UIColors::TOOLTIP_BG),
@@ -429,7 +602,7 @@ pub fn setup_tower_placement_panel(mut commands: Commands) {
         tooltip.spawn((
             Text::new(""),
             TextFont {
-                font_size: 12.0,  // Improved readability
+                font_size: 11.0,  // Improved readability
                 ..default()
             },
             TextColor(UIColors::TEXT_PRIMARY),
@@ -440,6 +613,205 @@ pub fn setup_tower_placement_panel(mut commands: Commands) {
             TooltipText,
         ));
     });
+}
+
+/// Setup the enhanced tower stat popup system
+pub fn setup_tower_stat_popup(mut commands: Commands) {
+    commands
+        .spawn((
+            Node {
+                position_type: PositionType::Absolute,
+                left: Val::Px(50.0), // Will be updated dynamically
+                top: Val::Px(100.0), // Will be updated dynamically
+                width: Val::Px(340.0), // Wider for comprehensive info
+                height: Val::Auto, // Auto height to fit content
+                flex_direction: FlexDirection::Column,
+                padding: UiRect::all(Val::Px(20.0)),
+                border: UiRect::all(Val::Px(2.0)),
+                row_gap: Val::Px(16.0),
+                display: Display::None, // Hidden by default
+                ..default()
+            },
+            BackgroundColor(UIColors::TOOLTIP_BG), // Use tooltip background for better contrast
+            BorderColor(UIColors::TOOLTIP_BORDER),
+            TowerStatPopup,
+        ))
+        .with_children(|parent| {
+            // Header section with tower name and close button
+            parent.spawn((
+                Node {
+                    width: Val::Percent(100.0),
+                    flex_direction: FlexDirection::Row,
+                    justify_content: JustifyContent::SpaceBetween,
+                    align_items: AlignItems::Center,
+                    margin: UiRect::bottom(Val::Px(12.0)),
+                    ..default()
+                },
+            )).with_children(|header| {
+                // Tower name
+                header.spawn((
+                    Text::new("Tower Information"),
+                    TextFont {
+                        font_size: 22.0,
+                        ..default()
+                    },
+                    TextColor(UIColors::TEXT_PRIMARY),
+                    PopupHeader,
+                ));
+
+                // Close button (X)
+                header.spawn((
+                    Button,
+                    Node {
+                        width: Val::Px(28.0),
+                        height: Val::Px(28.0),
+                        justify_content: JustifyContent::Center,
+                        align_items: AlignItems::Center,
+                        border: UiRect::all(Val::Px(1.0)),
+                        ..default()
+                    },
+                    BackgroundColor(UIColors::BUTTON_DEFAULT),
+                    BorderColor(UIColors::BORDER_DEFAULT),
+                    PopupCloseButton,
+                )).with_children(|button| {
+                    button.spawn((
+                        Text::new("X"),
+                        TextFont {
+                            font_size: 16.0,
+                            ..default()
+                        },
+                        TextColor(UIColors::TEXT_PRIMARY),
+                    ));
+                });
+            });
+
+            // Description section
+            parent.spawn((
+                Node {
+                    width: Val::Percent(100.0),
+                    padding: UiRect::all(Val::Px(12.0)),
+                    border: UiRect::all(Val::Px(1.0)),
+                    margin: UiRect::bottom(Val::Px(8.0)),
+                    ..default()
+                },
+                BackgroundColor(UIColors::HEADER_BG),
+                BorderColor(UIColors::BORDER_DEFAULT),
+            )).with_children(|section| {
+                section.spawn((
+                    Text::new("Tower description will appear here"),
+                    TextFont {
+                        font_size: 14.0,
+                        ..default()
+                    },
+                    TextColor(UIColors::TEXT_SECONDARY),
+                    PopupDescriptionSection,
+                ));
+            });
+
+            // Stats section
+            parent.spawn((
+                Node {
+                    width: Val::Percent(100.0),
+                    padding: UiRect::all(Val::Px(12.0)),
+                    border: UiRect::all(Val::Px(1.0)),
+                    margin: UiRect::bottom(Val::Px(8.0)),
+                    ..default()
+                },
+                BackgroundColor(UIColors::RESOURCE_BG),
+                BorderColor(UIColors::RESOURCE_BORDER),
+            )).with_children(|section| {
+                section.spawn((
+                    Text::new("Stats"),
+                    TextFont {
+                        font_size: 16.0,
+                        ..default()
+                    },
+                    TextColor(UIColors::TEXT_ACCENT),
+                    Node {
+                        margin: UiRect::bottom(Val::Px(8.0)),
+                        ..default()
+                    },
+                ));
+                section.spawn((
+                    Text::new("Tower stats will appear here"),
+                    TextFont {
+                        font_size: 13.0,
+                        ..default()
+                    },
+                    TextColor(UIColors::TEXT_PRIMARY),
+                    PopupStatsSection,
+                ));
+            });
+
+            // Cost section
+            parent.spawn((
+                Node {
+                    width: Val::Percent(100.0),
+                    padding: UiRect::all(Val::Px(12.0)),
+                    border: UiRect::all(Val::Px(1.0)),
+                    margin: UiRect::bottom(Val::Px(8.0)),
+                    ..default()
+                },
+                BackgroundColor(UIColors::RESOURCE_BG),
+                BorderColor(UIColors::RESOURCE_BORDER),
+            )).with_children(|section| {
+                section.spawn((
+                    Text::new("Cost"),
+                    TextFont {
+                        font_size: 16.0,
+                        ..default()
+                    },
+                    TextColor(UIColors::TEXT_ACCENT),
+                    Node {
+                        margin: UiRect::bottom(Val::Px(8.0)),
+                        ..default()
+                    },
+                ));
+                section.spawn((
+                    Text::new("Tower costs will appear here"),
+                    TextFont {
+                        font_size: 13.0,
+                        ..default()
+                    },
+                    TextColor(UIColors::TEXT_PRIMARY),
+                    PopupCostSection,
+                ));
+            });
+
+            // Upgrade preview section
+            parent.spawn((
+                Node {
+                    width: Val::Percent(100.0),
+                    padding: UiRect::all(Val::Px(12.0)),
+                    border: UiRect::all(Val::Px(1.0)),
+                    ..default()
+                },
+                BackgroundColor(UIColors::HEADER_BG),
+                BorderColor(UIColors::BORDER_DEFAULT),
+            )).with_children(|section| {
+                section.spawn((
+                    Text::new("Upgrade Preview"),
+                    TextFont {
+                        font_size: 16.0,
+                        ..default()
+                    },
+                    TextColor(UIColors::TEXT_SUCCESS),
+                    Node {
+                        margin: UiRect::bottom(Val::Px(8.0)),
+                        ..default()
+                    },
+                ));
+                section.spawn((
+                    Text::new("Upgrade information will appear here"),
+                    TextFont {
+                        font_size: 13.0,
+                        ..default()
+                    },
+                    TextColor(UIColors::TEXT_SECONDARY),
+                    PopupUpgradeSection,
+                ));
+            });
+        });
 }
 
 /// Setup the tower upgrade UI panel
@@ -672,9 +1044,9 @@ pub fn update_resource_status_system(
 ) {
     if economy.is_changed() {
         if let Ok(mut text) = resource_query.single_mut() {
-            // Enhanced formatting with better visual separation and readability
+            // Enhanced formatting with ASCII symbols for better compatibility
             **text = format!(
-                "\u{1F4B0} {} \u{2022} \u{1F4D6} {} \u{2022} \u{1F6E0} {} \u{2022} \u{26A1} {}",
+                "${}  |  R:{}  |  M:{}  |  E:{}",
                 economy.money,
                 economy.research_points,
                 economy.materials,
@@ -684,21 +1056,21 @@ pub fn update_resource_status_system(
     }
 }
 
-/// System to handle hover tooltips for tower buttons
+/// System to handle hover tooltips for tower buttons with improved positioning
 pub fn tower_tooltip_system(
-    hover_query: Query<(&HoverState, &Node), (With<TowerTypeButton>, Changed<HoverState>)>,
+    button_query: Query<(&HoverState, &GlobalTransform, &TowerTypeButton), With<Button>>,
     mut tooltip_query: Query<(&mut Node, &mut Text), (With<TowerTooltip>, Without<TowerTypeButton>)>,
     economy: Res<Economy>,
 ) {
     let mut show_tooltip = false;
     let mut tooltip_content = String::new();
-    let mut tooltip_position = (0.0, 0.0);
+    let mut tooltip_position = Vec2::ZERO;
 
-    // Check for hovered buttons
-    for (hover_state, button_node) in hover_query.iter() {
+    // Find any hovered button and get its position
+    for (hover_state, _global_transform, tower_button) in button_query.iter() {
         if hover_state.is_hovered {
             show_tooltip = true;
-            let tower_type = hover_state.tower_type;
+            let tower_type = tower_button.tower_type;
             let cost = tower_type.get_cost();
             let stats = TowerStats::new(tower_type);
             let can_afford = economy.can_afford(&cost);
@@ -720,15 +1092,15 @@ pub fn tower_tooltip_system(
             }
             let cost_display = cost_parts.join(" | ");
             
-            // Affordability status with clear indicators
+            // Affordability status with clear indicators - using ASCII
             let affordability = if can_afford {
-                "\u{2713} AFFORDABLE"
+                "[OK] AFFORDABLE"
             } else {
-                "\u{2717} INSUFFICIENT RESOURCES"
+                "[X] INSUFFICIENT RESOURCES"
             };
             
             tooltip_content = format!(
-                "{}\n{}\n\nCost: {}\nStatus: {}\n\nPerformance:\n\u{2022} DPS: {:.1}\n\u{2022} Damage: {:.1}\n\u{2022} Range: {:.1}\n\u{2022} Fire Rate: {:.1}/sec",
+                "{}\n{}\n\nCost: {}\nStatus: {}\n\nPerformance:\n* DPS: {:.1}\n* Damage: {:.1}\n* Range: {:.1}\n* Fire Rate: {:.1}/sec",
                 tower_type.get_name(),
                 tower_type.get_description(),
                 cost_display,
@@ -739,9 +1111,14 @@ pub fn tower_tooltip_system(
                 stats.fire_rate
             );
             
-            // Improved positioning - left side with better offset for readability
-            tooltip_position = (30.0, 100.0); // Better positioning
-            break;
+            // Position tooltip to the left of the tower selection panel
+            // Since tower buttons are in a fixed UI panel on the right side,
+            // we can use fixed positioning relative to the panel
+            tooltip_position = Vec2::new(
+                50.0,  // Fixed position on left side of screen
+                200.0 + (tower_type as u8 as f32 * 100.0)  // Staggered vertically by tower type
+            );
+            break; // Only show tooltip for first hovered button
         }
     }
 
@@ -749,8 +1126,8 @@ pub fn tower_tooltip_system(
     if let Ok((mut tooltip_node, mut tooltip_text)) = tooltip_query.single_mut() {
         if show_tooltip {
             tooltip_node.display = Display::Flex;
-            tooltip_node.left = Val::Px(tooltip_position.0);
-            tooltip_node.top = Val::Px(tooltip_position.1);
+            tooltip_node.left = Val::Px(tooltip_position.x);
+            tooltip_node.top = Val::Px(tooltip_position.y);
             **tooltip_text = tooltip_content;
         } else {
             tooltip_node.display = Display::None;
@@ -872,6 +1249,286 @@ pub fn update_upgrade_panel_system(
         }
         if let Ok(mut text) = upgrade_button_query.single_mut() {
             **text = "SELECT TOWER".to_string();
+        }
+    }
+}
+
+/// System to automatically show/hide stat popup on hover
+pub fn hover_stat_popup_system(
+    mut popup_state: ResMut<TowerStatPopupState>,
+    button_query: Query<(&HoverState, &GlobalTransform, &TowerTypeButton), With<Button>>,
+) {
+    let mut any_hovered = false;
+    let mut hovered_tower = None;
+    let mut hover_position = Vec2::ZERO;
+
+    // Check for any currently hovered button
+    for (hover_state, global_transform, tower_button) in button_query.iter() {
+        if hover_state.is_hovered {
+            any_hovered = true;
+            hovered_tower = Some(tower_button.tower_type);
+            let button_pos = global_transform.translation().truncate();
+            // Position popup to the left of the tower selection panel to avoid overlap
+            // Fixed position ensures consistent placement
+            hover_position = Vec2::new(50.0, button_pos.y);
+            break; // Only show popup for first hovered button
+        }
+    }
+
+    // Show popup if hovering, hide if not
+    if any_hovered {
+        if let Some(tower_type) = hovered_tower {
+            // Only update if it's a different tower type or not currently showing
+            if popup_state.active_tower_type != Some(tower_type) || !popup_state.visible {
+                popup_state.show_for_tower(tower_type, hover_position);
+            }
+        }
+    } else {
+        // Hide popup if no buttons are hovered
+        if popup_state.visible {
+            popup_state.hide();
+        }
+    }
+}
+
+/// System to handle tower stat popup close button
+pub fn popup_close_button_system(
+    mut popup_state: ResMut<TowerStatPopupState>,
+    mut interaction_query: Query<
+        (&Interaction, &mut BackgroundColor),
+        (Changed<Interaction>, With<PopupCloseButton>),
+    >,
+) {
+    for (interaction, mut color) in interaction_query.iter_mut() {
+        match *interaction {
+            Interaction::Pressed => {
+                popup_state.hide();
+                println!("Popup closed via close button");
+                *color = UIColors::BUTTON_SELECTED.into(); // Brief feedback
+            }
+            Interaction::Hovered => {
+                *color = UIColors::BUTTON_HOVER.into();
+            }
+            Interaction::None => {
+                *color = UIColors::BUTTON_DEFAULT.into();
+            }
+        }
+    }
+}
+
+/// System to manage tower stat popup visibility and content updates
+pub fn tower_stat_popup_system(
+    popup_state: Res<TowerStatPopupState>,
+    economy: Res<Economy>,
+    mut popup_query: Query<&mut Node, With<TowerStatPopup>>,
+    mut header_query: Query<&mut Text, (With<PopupHeader>, Without<PopupDescriptionSection>, Without<PopupStatsSection>, Without<PopupCostSection>, Without<PopupUpgradeSection>)>,
+    mut description_query: Query<&mut Text, (With<PopupDescriptionSection>, Without<PopupHeader>, Without<PopupStatsSection>, Without<PopupCostSection>, Without<PopupUpgradeSection>)>,
+    mut stats_query: Query<&mut Text, (With<PopupStatsSection>, Without<PopupHeader>, Without<PopupDescriptionSection>, Without<PopupCostSection>, Without<PopupUpgradeSection>)>,
+    mut cost_query: Query<&mut Text, (With<PopupCostSection>, Without<PopupHeader>, Without<PopupDescriptionSection>, Without<PopupStatsSection>, Without<PopupUpgradeSection>)>,
+    mut upgrade_query: Query<&mut Text, (With<PopupUpgradeSection>, Without<PopupHeader>, Without<PopupDescriptionSection>, Without<PopupStatsSection>, Without<PopupCostSection>)>,
+) {
+    // Update popup visibility and position
+    if let Ok(mut popup_node) = popup_query.single_mut() {
+        if popup_state.is_showing() {
+            popup_node.display = Display::Flex;
+            popup_node.left = Val::Px(popup_state.position.x);
+            popup_node.top = Val::Px(popup_state.position.y);
+        } else {
+            popup_node.display = Display::None;
+        }
+    }
+
+    // Update popup content when visible and tower type is available
+    if let Some(tower_type) = popup_state.active_tower_type {
+        let stats = TowerStats::new(tower_type);
+        let cost = tower_type.get_cost();
+        let can_afford = economy.can_afford(&cost);
+
+        // Update header
+        if let Ok(mut text) = header_query.single_mut() {
+            **text = format!("{}", tower_type.get_name());
+        }
+
+        // Update description
+        if let Ok(mut text) = description_query.single_mut() {
+            **text = format!("{}", tower_type.get_description());
+        }
+
+        // Update stats - calculate DPS and efficiency metrics
+        if let Ok(mut text) = stats_query.single_mut() {
+            let dps = stats.damage * stats.fire_rate;
+            let efficiency = dps / cost.money as f32; // Damage per dollar
+            
+            **text = format!(
+                "Damage: {:.1}\nRange: {:.1}\nFire Rate: {:.1}/sec\nDPS: {:.1}\nEfficiency: {:.2} DPS/$",
+                stats.damage,
+                stats.range,
+                stats.fire_rate,
+                dps,
+                efficiency
+            );
+        }
+
+        // Update cost with affordability indicators
+        if let Ok(mut text) = cost_query.single_mut() {
+            let affordability_status = if can_afford {
+                "[AFFORDABLE]"
+            } else {
+                "[INSUFFICIENT RESOURCES]"
+            };
+
+            let mut cost_parts = Vec::new();
+            if cost.money > 0 {
+                cost_parts.push(format!("Money: ${}", cost.money));
+            }
+            if cost.research_points > 0 {
+                cost_parts.push(format!("Research: {}", cost.research_points));
+            }
+            if cost.materials > 0 {
+                cost_parts.push(format!("Materials: {}", cost.materials));
+            }
+            if cost.energy > 0 {
+                cost_parts.push(format!("Energy: {}", cost.energy));
+            }
+
+            **text = format!(
+                "{}\n\n{}",
+                cost_parts.join("\n"),
+                affordability_status
+            );
+        }
+
+        // Update upgrade preview
+        if let Ok(mut text) = upgrade_query.single_mut() {
+            let mut preview_stats = stats.clone();
+            if preview_stats.can_upgrade() {
+                let upgrade_cost = preview_stats.get_upgrade_cost();
+                preview_stats.upgrade();
+                
+                let damage_increase = preview_stats.damage - stats.damage;
+                let range_increase = preview_stats.range - stats.range;
+                let fire_rate_increase = preview_stats.fire_rate - stats.fire_rate;
+                
+                **text = format!(
+                    "Level 2 Stats:\nDamage: {:.1} (+{:.1})\nRange: {:.1} (+{:.1})\nFire Rate: {:.1} (+{:.1})\n\nUpgrade Cost: ${} R:{} M:{} E:{}",
+                    preview_stats.damage, damage_increase,
+                    preview_stats.range, range_increase,
+                    preview_stats.fire_rate, fire_rate_increase,
+                    upgrade_cost.money, upgrade_cost.research_points, 
+                    upgrade_cost.materials, upgrade_cost.energy
+                );
+            } else {
+                **text = "This tower cannot be upgraded further.".to_string();
+            }
+        }
+    }
+}
+
+/// System to handle clicking outside the popup to close it
+pub fn popup_outside_click_system(
+    mut popup_state: ResMut<TowerStatPopupState>,
+    mouse_input: Res<MouseInputState>,
+    popup_query: Query<&GlobalTransform, With<TowerStatPopup>>,
+) {
+    if popup_state.is_showing() && mouse_input.left_clicked {
+        // Check if click is outside popup bounds
+        if let Ok(popup_transform) = popup_query.single() {
+            let popup_pos = popup_transform.translation().truncate();
+            let click_pos = mouse_input.world_position;
+            
+            // Define popup bounds (approximate)
+            let popup_bounds = Rect::from_center_size(popup_pos, Vec2::new(340.0, 400.0));
+            
+            if !popup_bounds.contains(click_pos) {
+                popup_state.hide();
+                println!("Popup closed via outside click");
+            }
+        }
+    }
+}
+
+/// System to handle Start Wave button clicks
+pub fn start_wave_button_system(
+    mut interaction_query: Query<
+        (&Interaction, &mut BackgroundColor, &mut BorderColor),
+        (Changed<Interaction>, With<StartWaveButton>),
+    >,
+    mut wave_start_events: EventWriter<StartWaveEvent>,
+    mut mouse_input_state: ResMut<MouseInputState>,
+    wave_manager: Res<WaveManager>,
+) {
+    for (interaction, mut bg_color, mut border_color) in &mut interaction_query {
+        // Check if wave can be started
+        let can_start_wave = wave_manager.current_wave == 0 || wave_manager.wave_complete();
+        
+        match *interaction {
+            Interaction::Pressed => {
+                // CRITICAL FIX: Consume the mouse click to prevent tower placement
+                mouse_input_state.left_clicked = false;
+                
+                if can_start_wave {
+                    // Send event to start new wave
+                    wave_start_events.write(StartWaveEvent);
+                    info!("Start Wave button pressed - new wave starting");
+                    *bg_color = BackgroundColor(UIColors::BUTTON_SELECTED);
+                } else {
+                    info!("Cannot start wave - current wave still in progress");
+                    *bg_color = BackgroundColor(UIColors::COST_UNAFFORDABLE);
+                }
+            }
+            Interaction::Hovered => {
+                if can_start_wave {
+                    *bg_color = BackgroundColor(UIColors::BUTTON_HOVER);
+                    *border_color = BorderColor(UIColors::BORDER_HOVER);
+                } else {
+                    *bg_color = BackgroundColor(UIColors::BUTTON_DISABLED);
+                    *border_color = BorderColor(UIColors::BORDER_DISABLED);
+                }
+            }
+            Interaction::None => {
+                if can_start_wave {
+                    *bg_color = BackgroundColor(UIColors::BUTTON_DEFAULT);
+                    *border_color = BorderColor(UIColors::BORDER_DEFAULT);
+                } else {
+                    *bg_color = BackgroundColor(UIColors::BUTTON_DISABLED);
+                    *border_color = BorderColor(UIColors::BORDER_DISABLED);
+                }
+            }
+        }
+    }
+}
+
+/// System to update Start Wave button text and state based on wave manager
+pub fn update_start_wave_button_system(
+    wave_manager: Res<WaveManager>,
+    mut text_query: Query<&mut Text, With<StartWaveButtonText>>,
+    mut button_query: Query<(&mut BackgroundColor, &mut BorderColor), (With<StartWaveButton>, Without<StartWaveButtonText>)>,
+) {
+    if wave_manager.is_changed() {
+        let can_start_wave = wave_manager.current_wave == 0 || wave_manager.wave_complete();
+        
+        // Update button text
+        if let Ok(mut text) = text_query.single_mut() {
+            **text = if can_start_wave {
+                if wave_manager.current_wave == 0 {
+                    "START FIRST WAVE".to_string()
+                } else {
+                    format!("START WAVE {}", wave_manager.current_wave + 1)
+                }
+            } else {
+                format!("WAVE {} IN PROGRESS", wave_manager.current_wave)
+            };
+        }
+        
+        // Update button appearance
+        if let Ok((mut bg_color, mut border_color)) = button_query.single_mut() {
+            if can_start_wave {
+                *bg_color = BackgroundColor(UIColors::BUTTON_DEFAULT);
+                *border_color = BorderColor(UIColors::BORDER_DEFAULT);
+            } else {
+                *bg_color = BackgroundColor(UIColors::BUTTON_DISABLED);
+                *border_color = BorderColor(UIColors::BORDER_DISABLED);
+            }
         }
     }
 }
