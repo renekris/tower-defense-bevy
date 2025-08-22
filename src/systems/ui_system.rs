@@ -21,23 +21,18 @@ pub fn update_ui_system(
         economy.money, economy.research_points, economy.materials, economy.energy
     );
 
-    if let Ok((_, mut text)) = economy_ui_query.get_single_mut() {
-        text.sections[0].value = economy_text;
+    if let Ok((_, mut text)) = economy_ui_query.single_mut() {
+        **text = economy_text;
     } else {
         // Create economy UI
         commands.spawn((
-            Text2dBundle {
-                text: Text::from_section(
-                    economy_text,
-                    TextStyle {
-                        font_size: 18.0,
-                        color: Color::srgb(1.0, 1.0, 0.0),
-                        ..default()
-                    },
-                ),
-                transform: Transform::from_translation(Vec3::new(-500.0, 340.0, 1.0)),
+            Text2d::new(economy_text),
+            TextFont {
+                font_size: 18.0,
                 ..default()
             },
+            TextColor(Color::srgb(1.0, 1.0, 0.0)),
+            Transform::from_translation(Vec3::new(-500.0, 340.0, 1.0)),
             EconomyUI,
         ));
     }
@@ -45,23 +40,18 @@ pub fn update_ui_system(
     // Update or create tower selection UI - now handled by tower UI panels
     let selection_text = "Use UI panels to select towers and upgrades".to_string();
 
-    if let Ok((_, mut text)) = selection_ui_query.get_single_mut() {
-        text.sections[0].value = selection_text;
+    if let Ok((_, mut text)) = selection_ui_query.single_mut() {
+        **text = selection_text;
     } else {
         // Create tower selection UI
         commands.spawn((
-            Text2dBundle {
-                text: Text::from_section(
-                    selection_text,
-                    TextStyle {
-                        font_size: 16.0,
-                        color: Color::srgb(0.8, 0.8, 1.0),
-                        ..default()
-                    },
-                ),
-                transform: Transform::from_translation(Vec3::new(-500.0, 300.0, 1.0)),
+            Text2d::new(selection_text),
+            TextFont {
+                font_size: 16.0,
                 ..default()
             },
+            TextColor(Color::srgb(0.8, 0.8, 1.0)),
+            Transform::from_translation(Vec3::new(-500.0, 300.0, 1.0)),
             TowerSelectionUI,
         ));
     }

@@ -74,7 +74,7 @@ pub fn projectile_spawning_system(
     mut towers: Query<(&mut Target, &TowerStats, &Transform)>,
     enemies: Query<&Transform, (With<Enemy>, Without<TowerStats>)>,
 ) {
-    let current_time = time.elapsed_seconds();
+    let current_time = time.elapsed_secs();
     
     for (mut target, stats, tower_transform) in towers.iter_mut() {
         // Check if we can shoot (fire rate control)
@@ -96,15 +96,12 @@ pub fn projectile_spawning_system(
                 
                 // Spawn projectile
                 commands.spawn((
-                    SpriteBundle {
-                        sprite: Sprite {
-                            color: projectile_color,
-                            custom_size: Some(Vec2::new(6.0, 6.0)),
-                            ..default()
-                        },
-                        transform: Transform::from_translation(tower_transform.translation),
+                    Sprite {
+                        color: projectile_color,
+                        custom_size: Some(Vec2::new(6.0, 6.0)),
                         ..default()
                     },
+                    Transform::from_translation(tower_transform.translation),
                     Projectile::new(
                         stats.damage,
                         projectile_speed,
@@ -127,7 +124,7 @@ pub fn projectile_movement_system(
     mut projectiles: Query<(Entity, &mut Transform, &Projectile)>,
     enemies: Query<&Transform, (With<Enemy>, Without<Projectile>)>,
 ) {
-    let delta_time = time.delta_seconds();
+    let delta_time = time.delta_secs();
     
     for (projectile_entity, mut projectile_transform, projectile) in projectiles.iter_mut() {
         // Determine target position (lead the target if it still exists)
@@ -159,7 +156,7 @@ pub fn collision_system(
     mut commands: Commands,
     mut economy: ResMut<Economy>,
     mut wave_status: ResMut<WaveStatus>,
-    debug_ui_state: Option<Res<crate::systems::debug_ui::DebugUIState>>,
+    // debug_ui_state: Option<Res<crate::systems::debug_ui::DebugUIState>>, // Disabled due to Bevy 0.16 Style issues
     debug_state: Option<Res<crate::systems::debug_visualization::DebugVisualizationState>>,
     projectiles: Query<(Entity, &Transform, &Projectile)>,
     mut enemies: Query<(Entity, &Transform, &mut Health), With<Enemy>>,
@@ -171,16 +168,8 @@ pub fn collision_system(
                 .distance(enemy_transform.translation.truncate());
             
             if distance < 16.0 { // Collision threshold
-                // Calculate effective damage with UI multiplier
-                let damage_multiplier = if let (Some(ui_state), Some(debug_state)) = (&debug_ui_state, &debug_state) {
-                    if debug_state.enabled {
-                        ui_state.tower_damage_multiplier
-                    } else {
-                        1.0
-                    }
-                } else {
-                    1.0
-                };
+                // Calculate effective damage with UI multiplier (UI disabled for now)
+                let damage_multiplier = 1.0; // Simplified since debug_ui is disabled
                 
                 let effective_damage = projectile_data.damage * damage_multiplier;
                 

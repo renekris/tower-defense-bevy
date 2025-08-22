@@ -98,7 +98,7 @@ pub fn debug_toggle_system(
 pub fn debug_visualization_system(
     mut commands: Commands,
     debug_state: Res<DebugVisualizationState>,
-    ui_state: Res<crate::systems::debug_ui::DebugUIState>,
+    // ui_state: Res<crate::systems::debug_ui::DebugUIState>, // Disabled due to Bevy 0.16 Style issues
     debug_entities: Query<Entity, With<DebugVisualization>>,
 ) {
     // Clean up existing debug entities when state changes
@@ -113,13 +113,13 @@ pub fn debug_visualization_system(
         return;
     }
     
-    // Generate the current path and grid for visualization using UI parameters
-    let enemy_path = generate_level_path_with_params(debug_state.current_wave, ui_state.current_obstacle_density);
+    // Generate the current path and grid for visualization using default parameters (UI disabled)
+    let enemy_path = generate_level_path_with_params(debug_state.current_wave, 0.15); // Default obstacle density
     let tower_zones = generate_placement_zones(debug_state.current_wave);
     
-    // Generate the procedural map to get the grid data with UI obstacle density
+    // Generate the procedural map to get the grid data with default obstacle density
     let seed = debug_state.current_wave as u64 * 12345 + 67890;
-    let grid = generate_procedural_map_with_density(seed, ui_state.current_obstacle_density);
+    let grid = generate_procedural_map_with_density(seed, 0.15); // Default obstacle density
     
     // Render grid cells
     if debug_state.show_grid || debug_state.show_obstacles {
@@ -178,15 +178,12 @@ fn render_grid(
             
             // Spawn the visual cell
             commands.spawn((
-                SpriteBundle {
-                    sprite: Sprite {
-                        color,
-                        custom_size: Some(size),
-                        ..default()
-                    },
-                    transform: Transform::from_translation(world_pos.extend(z_order)),
+                Sprite {
+                    color,
+                    custom_size: Some(size),
                     ..default()
                 },
+                Transform::from_translation(world_pos.extend(z_order)),
                 DebugVisualization,
                 GridCell {
                     grid_pos,
@@ -214,15 +211,12 @@ fn render_path(
         };
         
         commands.spawn((
-            SpriteBundle {
-                sprite: Sprite {
-                    color,
-                    custom_size: Some(Vec2::new(8.0, 8.0)),
-                    ..default()
-                },
-                transform: Transform::from_translation(waypoint.extend(0.2)),
+            Sprite {
+                color,
+                custom_size: Some(Vec2::new(8.0, 8.0)),
                 ..default()
             },
+            Transform::from_translation(waypoint.extend(0.2)),
             DebugVisualization,
             PathVisualization,
         ));
@@ -240,16 +234,13 @@ fn render_path(
         let angle = direction.y.atan2(direction.x);
         
         commands.spawn((
-            SpriteBundle {
-                sprite: Sprite {
-                    color: Color::srgb(0.0, 0.7, 0.0),
-                    custom_size: Some(Vec2::new(length, 3.0)),
-                    ..default()
-                },
-                transform: Transform::from_translation(midpoint.extend(0.15))
-                    .with_rotation(Quat::from_rotation_z(angle)),
+            Sprite {
+                color: Color::srgb(0.0, 0.7, 0.0),
+                custom_size: Some(Vec2::new(length, 3.0)),
                 ..default()
             },
+            Transform::from_translation(midpoint.extend(0.15))
+                .with_rotation(Quat::from_rotation_z(angle)),
             DebugVisualization,
             PathVisualization,
         ));
@@ -271,15 +262,12 @@ fn render_tower_zones(
         
         // Render zone outline
         commands.spawn((
-            SpriteBundle {
-                sprite: Sprite {
-                    color: Color::srgba(0.2, 0.2, 0.8, 0.3),
-                    custom_size: Some(size),
-                    ..default()
-                },
-                transform: Transform::from_translation(center.extend(0.05)),
+            Sprite {
+                color: Color::srgba(0.2, 0.2, 0.8, 0.3),
+                custom_size: Some(size),
                 ..default()
             },
+            Transform::from_translation(center.extend(0.05)),
             DebugVisualization,
             TowerZoneVisualization,
         ));
@@ -294,15 +282,12 @@ fn render_tower_zones(
         };
         
         commands.spawn((
-            SpriteBundle {
-                sprite: Sprite {
-                    color: value_color,
-                    custom_size: Some(Vec2::new(6.0, 6.0)),
-                    ..default()
-                },
-                transform: Transform::from_translation(center.extend(0.1)),
+            Sprite {
+                color: value_color,
+                custom_size: Some(Vec2::new(6.0, 6.0)),
                 ..default()
             },
+            Transform::from_translation(center.extend(0.1)),
             DebugVisualization,
             TowerZoneVisualization,
         ));
@@ -382,19 +367,14 @@ fn render_debug_info(
     
     // Render main info panel (top-left)
     commands.spawn((
-        Text2dBundle {
-            text: Text::from_section(
-                info_text,
-                TextStyle {
-                    font_size: 14.0,
-                    color: Color::srgb(1.0, 1.0, 0.8), // Light yellow for visibility
-                    ..default()
-                },
-            ),
-            transform: Transform::from_translation(Vec3::new(-620.0, 340.0, 1.0)),
-            text_anchor: bevy::sprite::Anchor::TopLeft,
+        Text2d::new(info_text),
+        TextFont {
+            font_size: 14.0,
             ..default()
         },
+        TextColor(Color::srgb(1.0, 1.0, 0.8)),
+        Transform::from_translation(Vec3::new(-620.0, 340.0, 1.0)),
+        TextLayout::new_with_justify(JustifyText::Left),
         DebugVisualization,
         DebugInfoText,
     ));
@@ -417,19 +397,14 @@ fn render_debug_info(
     );
     
     commands.spawn((
-        Text2dBundle {
-            text: Text::from_section(
-                perf_text,
-                TextStyle {
-                    font_size: 12.0,
-                    color: Color::srgb(0.8, 1.0, 0.8), // Light green
-                    ..default()
-                },
-            ),
-            transform: Transform::from_translation(Vec3::new(400.0, 340.0, 1.0)),
-            text_anchor: bevy::sprite::Anchor::TopLeft,
+        Text2d::new(perf_text),
+        TextFont {
+            font_size: 12.0,
             ..default()
         },
+        TextColor(Color::srgb(0.8, 1.0, 0.8)),
+        Transform::from_translation(Vec3::new(400.0, 340.0, 1.0)),
+        TextLayout::new_with_justify(JustifyText::Left),
         DebugVisualization,
         DebugInfoText,
     ));
@@ -446,19 +421,14 @@ fn render_debug_info(
         );
         
         commands.spawn((
-            Text2dBundle {
-                text: Text::from_section(
-                    zone_text,
-                    TextStyle {
-                        font_size: 10.0,
-                        color: Color::srgb(0.9, 0.9, 1.0), // Light blue
-                        ..default()
-                    },
-                ),
-                transform: Transform::from_translation(center.extend(0.3)),
-                text_anchor: bevy::sprite::Anchor::Center,
+            Text2d::new(zone_text),
+            TextFont {
+                font_size: 10.0,
                 ..default()
             },
+            TextColor(Color::srgb(0.9, 0.9, 1.0)),
+            Transform::from_translation(center.extend(0.3)),
+            TextLayout::new_with_justify(JustifyText::Center),
             DebugVisualization,
             DebugInfoText,
         ));
