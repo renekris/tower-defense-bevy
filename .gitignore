@@ -22,4 +22,7 @@ Thumbs.db
 # Screenshots
 *.png
 
+# Claude Code local configuration (should not be shared)
+.claude/settings.local.json
+
 CLAUDE.md
