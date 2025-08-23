@@ -12,8 +12,10 @@ pub fn update_ui_system(
     mut commands: Commands,
     economy: Res<Economy>,
     _mouse_state: Res<MouseInputState>,
-    mut economy_ui_query: Query<(Entity, &mut Text), (With<EconomyUI>, Without<TowerSelectionUI>)>,
-    mut selection_ui_query: Query<(Entity, &mut Text), (With<TowerSelectionUI>, Without<EconomyUI>)>,
+    mut economy_ui_query: Query<&mut Text, (With<EconomyUI>, Without<TowerSelectionUI>)>,
+    mut selection_ui_query: Query<&mut Text, (With<TowerSelectionUI>, Without<EconomyUI>)>,
+    economy_ui_exists: Query<(), With<EconomyUI>>,
+    selection_ui_exists: Query<(), With<TowerSelectionUI>>,
 ) {
     // Update or create economy UI
     let economy_text = format!(
@@ -21,10 +23,10 @@ pub fn update_ui_system(
         economy.money, economy.research_points, economy.materials, economy.energy
     );
 
-    if let Ok((_, mut text)) = economy_ui_query.single_mut() {
+    if let Ok(mut text) = economy_ui_query.single_mut() {
         **text = economy_text;
-    } else {
-        // Create economy UI
+    } else if economy_ui_exists.is_empty() {
+        // Create economy UI only if none exists
         commands.spawn((
             Text2d::new(economy_text),
             TextFont {
@@ -40,10 +42,10 @@ pub fn update_ui_system(
     // Update or create tower selection UI - now handled by tower UI panels
     let selection_text = "Use UI panels to select towers and upgrades".to_string();
 
-    if let Ok((_, mut text)) = selection_ui_query.single_mut() {
+    if let Ok(mut text) = selection_ui_query.single_mut() {
         **text = selection_text;
-    } else {
-        // Create tower selection UI
+    } else if selection_ui_exists.is_empty() {
+        // Create tower selection UI only if none exists
         commands.spawn((
             Text2d::new(selection_text),
             TextFont {

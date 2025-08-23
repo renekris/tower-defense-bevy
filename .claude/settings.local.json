@@ -14,9 +14,14 @@
       "mcp__git__git_diff_unstaged",
       "mcp__filesystem__read_text_file",
       "mcp__filesystem__edit_file",
-      "Bash(grep:*)"
+      "Bash(grep:*)",
+      "mcp__memory__add_observations",
+      "mcp__filesystem__list_directory",
+      "mcp__context7__resolve-library-id",
+      "mcp__context7__get-library-docs"
     ],
     "deny": [],
     "ask": []
-  }
+  },
+  "outputStyle": "Explanatory"
 }

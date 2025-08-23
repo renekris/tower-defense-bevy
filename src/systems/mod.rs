@@ -7,8 +7,8 @@ pub mod ui_system;
 pub mod input_system;
 pub mod path_generation;
 pub mod debug_visualization;
-// pub mod debug_ui; // Disabled due to Bevy 0.16 Style component issues
-// pub mod tower_ui; // Disabled due to Bevy 0.16 Style component issues
+pub mod debug_ui;
+pub mod tower_ui;
 
 pub use tower_system::*;
 pub use enemy_system::*;
@@ -19,5 +19,5 @@ pub use ui_system::*;
 pub use input_system::*;
 pub use path_generation::*;
 pub use debug_visualization::*;
-// pub use debug_ui::*; // Disabled due to Bevy 0.16 Style component issues
-// pub use tower_ui::*; // Disabled due to Bevy 0.16 Style component issues
+pub use debug_ui::*;
+pub use tower_ui::*;

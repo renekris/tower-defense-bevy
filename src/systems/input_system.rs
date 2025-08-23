@@ -4,7 +4,7 @@ use bevy::window::PrimaryWindow;
 use crate::resources::*;
 use crate::components::*;
 use crate::systems::combat_system::Target;
-// use crate::systems::tower_ui::TowerSelectionState; // Disabled due to Bevy 0.16 Style issues
+use crate::systems::tower_ui::TowerSelectionState;
 
 #[derive(Resource, Debug)]
 pub struct MouseInputState {
@@ -347,8 +347,7 @@ pub fn setup_placement_zones(mut commands: Commands) {
             custom_size: Some(Vec2::new(200.0, 400.0)),
             ..default()
         },
-        Transform::from_translation(Vec3::new(300.0, 0.0, 0.5)), // Positive Z
-            Transform::from_translation(Vec3::new(-300.0, 0.0, 0.5)), // Positive Z
+        Transform::from_translation(Vec3::new(-300.0, 0.0, 0.5)), // Positive Z
         PlacementZoneMarker {
             zone_type: PlacementZoneType::GridZone,
         },
@@ -362,7 +361,6 @@ pub fn setup_placement_zones(mut commands: Commands) {
             ..default()
         },
         Transform::from_translation(Vec3::new(300.0, 0.0, 0.5)), // Positive Z
-            Transform::from_translation(Vec3::new(300.0, 0.0, 0.5)), // Positive Z
         PlacementZoneMarker {
             zone_type: PlacementZoneType::GridZone,
         },

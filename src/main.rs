@@ -11,19 +11,17 @@ use systems::input_system::*;
 use systems::ui_system::*;
 use systems::combat_system::*;
 use systems::debug_visualization::*;
-// use systems::debug_ui::GamePathLine; // Disabled due to Bevy 0.16 Style issues
-// use systems::debug_ui::*; // Disabled due to Bevy 0.16 Style issues
-// Tower UI systems disabled due to Bevy 0.16 Style issues
-// use systems::tower_ui::{
-//     TowerSelectionState, 
-//     setup_tower_placement_panel, 
-//     setup_tower_upgrade_panel,
-//     tower_selection_system,
-//     tower_type_button_system,
-//     upgrade_button_system,
-//     update_upgrade_panel_system,
-//     selected_tower_indicator_system,
-// };
+use systems::debug_ui::*;
+use systems::tower_ui::{
+    TowerSelectionState, 
+    setup_tower_placement_panel, 
+    setup_tower_upgrade_panel,
+    tower_selection_system,
+    tower_type_button_system,
+    upgrade_button_system,
+    update_upgrade_panel_system,
+    selected_tower_indicator_system,
+};
 
 fn main() {
     App::new()
@@ -36,11 +34,10 @@ fn main() {
             }),
             ..default()
         }))
-        // Add Remote Protocol plugin for MCP server integration
-        .add_plugins(bevy::remote::RemotePlugin::default())
+        // Add BRP Extras plugin (includes RemotePlugin for MCP server integration)
         .add_plugins(BrpExtrasPlugin)
         // Add custom plugins
-        // .add_plugins(DebugUIPlugin) // Temporarily disabled due to Bevy 0.16 Style component changes
+        .add_plugins(DebugUIPlugin)
         // Initialize game resources
         .init_resource::<Score>()
         .init_resource::<WaveManager>()
@@ -49,10 +46,10 @@ fn main() {
         .init_resource::<MouseInputState>()
         .init_resource::<WaveStatus>()
         .init_resource::<DebugVisualizationState>()
-        // .init_resource::<TowerSelectionState>() // Disabled due to UI issues
+        .init_resource::<TowerSelectionState>()
         .insert_resource(create_default_path())
         // Setup systems
-        .add_systems(Startup, (setup, setup_placement_zones /* setup_tower_placement_panel, setup_tower_upgrade_panel disabled due to Bevy 0.16 Style issues */))
+        .add_systems(Startup, (setup, setup_placement_zones, setup_tower_placement_panel, setup_tower_upgrade_panel))
         // Game systems - Split into groups to avoid tuple size limits
         .add_systems(Update, (
             // Input and UI systems
@@ -61,14 +58,13 @@ fn main() {
             // tower_placement_preview_system, // Disabled due to UI dependency
             update_ui_system,
         ))
-        // Tower UI systems disabled due to Bevy 0.16 Style issues
-        // .add_systems(Update, (
-        //     tower_selection_system,
-        //     tower_type_button_system,
-        //     upgrade_button_system,
-        //     update_upgrade_panel_system,
-        //     selected_tower_indicator_system,
-        // ))
+        .add_systems(Update, (
+            tower_selection_system,
+            tower_type_button_system,
+            upgrade_button_system,
+            update_upgrade_panel_system,
+            selected_tower_indicator_system,
+        ))
         .add_systems(Update, (
             // Debug visualization systems
             debug_toggle_system,
