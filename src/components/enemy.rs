@@ -18,6 +18,26 @@ impl Default for Enemy {
     }
 }
 
+impl Enemy {
+    /// Create a new enemy with stats scaled based on wave number
+    /// This implements proper difficulty progression
+    pub fn for_wave(wave_number: u32) -> Self {
+        let wave = wave_number.max(1); // Ensure minimum wave 1
+        
+        Self {
+            speed: 50.0 + (wave as f32 * 5.0),           // Speed increases by 5/wave
+            path_index: 0,
+            reward: 8 + (wave * 2),                      // Reward scales with difficulty
+        }
+    }
+    
+    /// Get the appropriate health for this enemy based on wave number
+    pub fn health_for_wave(wave_number: u32) -> f32 {
+        let wave = wave_number.max(1); // Ensure minimum wave 1
+        50.0 + (wave as f32 * 25.0)  // Health: Wave 1=75, Wave 2=100, Wave 3=125, etc.
+    }
+}
+
 /// Component that tracks an enemy's progress along the path (0.0 to 1.0)
 #[derive(Component)]
 pub struct PathProgress {

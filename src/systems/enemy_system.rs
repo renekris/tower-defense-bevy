@@ -17,10 +17,11 @@ pub fn enemy_spawning_system(
         // Get the starting position from the path
         let start_pos = enemy_path.get_position_at_progress(0.0);
 
-        // Spawn a new enemy entity with visual sprite
+        // Spawn a new enemy entity with wave-scaled stats for proper difficulty progression
+        let current_wave = wave_manager.current_wave;
         commands.spawn((
-            Enemy::default(),
-            Health::new(50.0),
+            Enemy::for_wave(current_wave),                    // Wave-scaled speed and reward
+            Health::new(Enemy::health_for_wave(current_wave)), // Wave-scaled health
             PathProgress::new(),
             Sprite {
                 color: Color::srgb(1.0, 0.2, 0.2), // Red color for enemies
