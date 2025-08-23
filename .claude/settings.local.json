@@ -18,7 +18,9 @@
       "mcp__memory__add_observations",
       "mcp__filesystem__list_directory",
       "mcp__context7__resolve-library-id",
-      "mcp__context7__get-library-docs"
+      "mcp__context7__get-library-docs",
+      "mcp__filesystem__directory_tree",
+      "mcp__filesystem__read_multiple_files"
     ],
     "deny": [],
     "ask": []
