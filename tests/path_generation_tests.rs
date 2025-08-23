@@ -7,7 +7,7 @@ fn test_grid_creation() {
     
     assert_eq!(grid.width, 20);
     assert_eq!(grid.height, 12);
-    assert_eq!(grid.cell_size, 64.0);
+    assert_eq!(grid.cell_size, 40.0);
     assert_eq!(grid.cells.len(), 12); // Height
     assert_eq!(grid.cells[0].len(), 20); // Width
     
@@ -27,9 +27,9 @@ fn test_grid_coordinate_conversion() {
     let center_grid = GridPos::new(10, 6);
     let center_world = grid.grid_to_world(center_grid);
     
-    // For a 20x12 grid with 64.0 cell size, center should be at (32, 32)
-    assert!((center_world.x - 32.0).abs() < 1.0, "Center X should be near 32, got {}", center_world.x);
-    assert!((center_world.y - 32.0).abs() < 1.0, "Center Y should be near 32, got {}", center_world.y);
+    // For a 20x12 grid with 40.0 cell size, center should be at (20, 20)
+    assert!((center_world.x - 20.0).abs() < 1.0, "Center X should be near 20, got {}", center_world.x);
+    assert!((center_world.y - 20.0).abs() < 1.0, "Center Y should be near 20, got {}", center_world.y);
     
     // Test round-trip conversion
     if let Some(converted_back) = grid.world_to_grid(center_world) {
@@ -237,9 +237,9 @@ fn test_enemy_path_conversion() {
 fn test_procedural_map_generation() {
     let grid = generate_procedural_map(12345, 0.3);
     
-    // Basic validation
-    assert_eq!(grid.width, 20);
-    assert_eq!(grid.height, 12);
+    // Basic validation - updated for dense unified grid dimensions
+    assert_eq!(grid.width, 32);
+    assert_eq!(grid.height, 18);
     
     // Entry and exit should be set
     assert!(grid.entry_point.x < grid.width);
