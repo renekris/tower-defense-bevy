@@ -13,6 +13,11 @@ pub struct DebugUIState {
     pub enemy_spawn_rate: f32,
     pub tower_damage_multiplier: f32,
     pub current_wave: u32,
+    
+    // Track last logged values to prevent spam
+    pub last_logged_obstacle_density: f32,
+    pub last_logged_spawn_rate: f32,
+    pub last_logged_damage_multiplier: f32,
 }
 
 impl Default for DebugUIState {
@@ -28,6 +33,9 @@ impl Default for DebugUIState {
             enemy_spawn_rate: 1.0,
             tower_damage_multiplier: 1.0,
             current_wave: 1,
+            last_logged_obstacle_density: -1.0, // Initialize to impossible values
+            last_logged_spawn_rate: -1.0,
+            last_logged_damage_multiplier: -1.0,
         }
     }
 }
@@ -99,7 +107,7 @@ pub struct SliderValueText {
     pub slider_type: SliderType,
 }
 
-/// Resource to track which slider is being dragged
+/// Resource to track which slider is being dragged (deprecated - using simplified approach)
 #[derive(Resource, Default)]
 pub struct SliderDragState {
     pub dragging: Option<SliderType>,

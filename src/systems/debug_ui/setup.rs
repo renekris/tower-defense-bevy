@@ -3,20 +3,20 @@ use super::components::*;
 
 /// Main setup system for debug UI
 pub fn setup_debug_ui(mut commands: Commands) {
-    println!("DEBUG: Creating simple test debug UI panel");
+    println!("DEBUG: Creating comprehensive debug UI panel");
     
-    // Create a simple test panel first to verify basic functionality
+    // Create the main debug panel with full functionality
     let panel_entity = commands
         .spawn((
             Node {
                 position_type: PositionType::Absolute,
                 right: Val::Px(10.0),
                 top: Val::Px(50.0),
-                width: Val::Px(250.0),
-                height: Val::Px(200.0),
+                width: Val::Px(280.0),
+                height: Val::Px(500.0),
                 flex_direction: FlexDirection::Column,
                 padding: UiRect::all(Val::Px(10.0)),
-                display: Display::Flex, // Visible by default for testing
+                display: Display::None, // Hidden by default
                 ..default()
             },
             BackgroundColor(Color::srgba(0.0, 0.0, 0.0, 0.9)),
@@ -24,20 +24,33 @@ pub fn setup_debug_ui(mut commands: Commands) {
         ))
         .id();
         
-    println!("DEBUG: Simple debug panel created with entity ID: {:?}", panel_entity);
+    println!("DEBUG: Comprehensive debug panel created with entity ID: {:?}", panel_entity);
     
-    // Add a simple text child to verify the panel works
+    // Add all UI sections to the panel
     commands.entity(panel_entity).with_children(|parent| {
+        // Panel title
         parent.spawn((
-            Text::new("Debug Panel (F2)\nPress F2 to toggle"),
+            Text::new("DEBUG PANEL (F2)"),
             TextFont {
-                font_size: 14.0,
+                font_size: 16.0,
                 ..default()
             },
-            TextColor(Color::WHITE),
+            TextColor(Color::srgb(1.0, 1.0, 0.6)),
+            Node {
+                margin: UiRect::bottom(Val::Px(10.0)),
+                ..default()
+            },
         ));
-        println!("DEBUG: Added text child to debug panel");
+        
+        // Create all UI sections
+        create_ui_section(parent, UISectionType::Controls);
+        create_ui_section(parent, UISectionType::Parameters);
+        create_ui_section(parent, UISectionType::Metrics);
+        create_ui_section(parent, UISectionType::Actions);
+        create_ui_section(parent, UISectionType::Help);
     });
+    
+    println!("DEBUG: All UI sections added to debug panel");
 }
 
 /// Helper function to create UI sections
