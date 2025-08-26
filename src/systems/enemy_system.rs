@@ -1,6 +1,11 @@
 use bevy::prelude::*;
 use crate::components::*;
 use crate::resources::*;
+use crate::systems::path_generation::generate_level_path;
+
+/// Event sent when the player clicks the Start Wave button
+#[derive(Event)]
+pub struct StartWaveEvent;
 
 /// System that spawns enemies when the wave manager indicates it's time
 pub fn enemy_spawning_system(
@@ -76,16 +81,123 @@ pub fn enemy_cleanup_system(
 }
 
 /// System that handles manual wave spawning (for Phase 1)
-/// Press SPACE to start the next wave
+/// Now controlled via UI button instead of keyboard
 pub fn manual_wave_system(
     mut wave_manager: ResMut<WaveManager>,
-    keyboard_input: Res<ButtonInput<KeyCode>>,
+    mut wave_start_events: EventReader<StartWaveEvent>,
 ) {
-    if keyboard_input.just_pressed(KeyCode::Space) {
-        // Start a new wave with 5 enemies
-        // Later this can be made configurable or progressive
+    for _event in wave_start_events.read() {
         if wave_manager.current_wave == 0 || wave_manager.wave_complete() {
-            wave_manager.start_wave(5);
+            // Calculate progressive enemy count based on wave number
+            let next_wave = wave_manager.current_wave + 1;
+            let enemy_count = calculate_enemies_for_wave(next_wave);
+            
+            // Start wave with progressive scaling
+            wave_manager.start_wave(enemy_count);
+            info!("Started wave {} with {} enemies", next_wave, enemy_count);
         }
+    }
+}
+
+/// Calculate the number of enemies for a given wave with progressive difficulty scaling
+pub fn calculate_enemies_for_wave(wave_number: u32) -> u32 {
+    let wave = wave_number.max(1); // Ensure minimum wave 1
+    
+    // Progressive scaling formula:
+    // Wave 1: 5 enemies (base)
+    // Wave 2: 7 enemies (+2)
+    // Wave 3: 10 enemies (+3) 
+    // Wave 4: 14 enemies (+4)
+    // Wave 5: 19 enemies (+5)
+    // Formula: base + sum of increases = 5 + (wave-1) + (wave-1)*(wave-2)/2
+    
+    let base_enemies = 5u32;
+    let linear_scaling = wave - 1;  // +1 per wave after wave 1
+    let exponential_scaling = (wave - 1) * (wave.saturating_sub(2)) / 2; // Accelerating increase
+    
+    base_enemies + linear_scaling + exponential_scaling
+}
+
+/// System that generates the initial path when the game starts
+/// Path persists across all waves for consistency
+pub fn path_generation_system(
+    mut enemy_path: ResMut<EnemyPath>,
+    wave_manager: Res<WaveManager>,
+) {
+    // Only generate path once when the game first starts
+    // This ensures the path stays the same across all waves
+    if wave_manager.is_added() || (wave_manager.current_wave == 1 && wave_manager.enemies_spawned == 0 && enemy_path.waypoints.is_empty()) {
+        let new_path = generate_level_path(1); // Use wave 1 seed for consistent path
+        *enemy_path = new_path;
+        info!(
+            "Generated persistent path with {} waypoints (will be used for all waves)", 
+            enemy_path.waypoints.len()
+        );
+    }
+}
+
+/// System that updates path visualization when the path changes
+/// This creates/updates visual path segments that show players where enemies will move
+pub fn path_visualization_system(
+    mut commands: Commands,
+    enemy_path: Res<EnemyPath>,
+    existing_path_viz: Query<Entity, With<crate::components::PathVisualization>>,
+) {
+    // Only update visualization when the path resource changes
+    if enemy_path.is_changed() && !enemy_path.is_added() {
+        // Remove existing path visualization entities
+        for entity in existing_path_viz.iter() {
+            commands.entity(entity).despawn();
+        }
+        
+        // Create new path visualization based on current path
+        for i in 0..enemy_path.waypoints.len() - 1 {
+            let start = enemy_path.waypoints[i];
+            let end = enemy_path.waypoints[i + 1];
+            let midpoint = (start + end) / 2.0;
+            let length = start.distance(end);
+            
+            // Calculate rotation angle to align the rectangle with the path segment
+            let direction = end - start;
+            let angle = direction.y.atan2(direction.x);
+            
+            commands.spawn((
+                Sprite {
+                    color: Color::srgb(0.5, 0.5, 0.5),
+                    custom_size: Some(Vec2::new(length, 5.0)),
+                    ..default()
+                },
+                Transform::from_translation(midpoint.extend(-1.0))
+                    .with_rotation(Quat::from_rotation_z(angle)),
+                crate::components::PathVisualization,
+            ));
+        }
+        
+        info!("Updated path visualization with {} segments", enemy_path.waypoints.len() - 1);
+    } 
+    // On first run (when resource is added), create initial visualization
+    else if enemy_path.is_added() {
+        for i in 0..enemy_path.waypoints.len() - 1 {
+            let start = enemy_path.waypoints[i];
+            let end = enemy_path.waypoints[i + 1];
+            let midpoint = (start + end) / 2.0;
+            let length = start.distance(end);
+            
+            let direction = end - start;
+            let angle = direction.y.atan2(direction.x);
+            
+            commands.spawn((
+                Sprite {
+                    color: Color::srgb(0.5, 0.5, 0.5),
+                    custom_size: Some(Vec2::new(length, 5.0)),
+                    ..default()
+                },
+                Transform::from_translation(midpoint.extend(-1.0))
+                    .with_rotation(Quat::from_rotation_z(angle)),
+                crate::components::PathVisualization,
+            ));
+        }
+        
+        info!("Created initial path visualization with {} segments", enemy_path.waypoints.len() - 1);
     }
 }

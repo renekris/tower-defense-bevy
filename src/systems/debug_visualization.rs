@@ -1,6 +1,7 @@
 use bevy::prelude::*;
 use crate::resources::*;
 use crate::systems::path_generation::*;
+use crate::systems::unified_grid::{UnifiedGridSystem, GridVisualizationMode};
 
 /// Resource to track debug visualization state
 #[derive(Resource, Default)]
@@ -13,9 +14,9 @@ pub struct DebugVisualizationState {
     pub show_grid: bool,
     /// Whether to show obstacles
     pub show_obstacles: bool,
-    /// Whether to show generated path
+    /// Whether to show generated path (deprecated - now handled by unified grid)
     pub show_path: bool,
-    /// Whether to show tower zones
+    /// Whether to show tower zones (deprecated - now handled by unified grid)
     pub show_tower_zones: bool,
 }
 
@@ -26,8 +27,8 @@ impl DebugVisualizationState {
             current_wave: 1,
             show_grid: true,
             show_obstacles: true,
-            show_path: true,
-            show_tower_zones: true,
+            show_path: false, // Disabled - handled by unified grid system
+            show_tower_zones: false, // Disabled - handled by unified grid system
         }
     }
     
@@ -40,18 +41,13 @@ impl DebugVisualizationState {
 #[derive(Component)]
 pub struct DebugVisualization;
 
-/// Marker component for grid cell visualization
-#[derive(Component)]
-pub struct GridCell {
-    pub grid_pos: GridPos,
-    pub cell_type: CellType,
-}
+// GridCell component removed - grid visualization now handled by unified grid system
 
-/// Marker component for path visualization
+/// Marker component for path visualization (deprecated - use unified grid)
 #[derive(Component)]
 pub struct PathVisualization;
 
-/// Marker component for tower zone visualization
+/// Marker component for tower zone visualization (deprecated - use unified grid)
 #[derive(Component)]
 pub struct TowerZoneVisualization;
 
@@ -62,14 +58,29 @@ pub struct DebugInfoText;
 /// System to handle debug visualization toggle input
 pub fn debug_toggle_system(
     mut debug_state: ResMut<DebugVisualizationState>,
+    mut unified_grid: ResMut<UnifiedGridSystem>,
     keyboard_input: Res<ButtonInput<KeyCode>>,
 ) {
     if keyboard_input.just_pressed(KeyCode::F1) {
         debug_state.toggle();
         if debug_state.enabled {
             println!("Debug visualization enabled (F1 to toggle)");
+            // Switch to debug mode when debug visualization is enabled
+            // unless we're currently in placement mode
+            if unified_grid.mode != GridVisualizationMode::Placement {
+                unified_grid.mode = GridVisualizationMode::Debug;
+            }
+            // Enable all visualization features in debug mode
+            unified_grid.show_path = true;
+            unified_grid.show_zones = true;
+            unified_grid.show_obstacles = true;
         } else {
             println!("Debug visualization disabled");
+            // Switch back to normal mode when debug visualization is disabled
+            // unless we're currently in placement mode
+            if unified_grid.mode == GridVisualizationMode::Debug {
+                unified_grid.mode = GridVisualizationMode::Normal;
+            }
         }
     }
     
@@ -101,14 +112,14 @@ pub fn debug_visualization_system(
     // ui_state: Res<crate::systems::debug_ui::DebugUIState>, // Disabled due to Bevy 0.16 Style issues
     debug_entities: Query<Entity, With<DebugVisualization>>,
 ) {
-    // Clean up existing debug entities when state changes
-    if debug_state.is_changed() {
-        for entity in debug_entities.iter() {
-            commands.entity(entity).despawn();
-        }
+    // CRITICAL FIX: Always clean up existing debug entities first to prevent memory leaks
+    // This ensures entities are cleaned up even if debug is toggled multiple times rapidly
+    for entity in debug_entities.iter() {
+        commands.entity(entity).despawn();
     }
     
-    // Only render when enabled
+    // Only generate PathGrid resource when debug is enabled
+    // The actual visualization is handled by unified grid system
     if !debug_state.enabled {
         return;
     }
@@ -121,178 +132,26 @@ pub fn debug_visualization_system(
     let seed = debug_state.current_wave as u64 * 12345 + 67890;
     let grid = generate_procedural_map_with_density(seed, 0.15); // Default obstacle density
     
-    // Render grid cells
-    if debug_state.show_grid || debug_state.show_obstacles {
-        render_grid(&mut commands, &grid, &debug_state);
-    }
+    // Store the PathGrid as a resource so the unified grid can access it for debug visualization
+    commands.insert_resource(grid.clone());
     
-    // Render path
-    if debug_state.show_path {
-        render_path(&mut commands, &enemy_path, &grid);
-    }
+    // Path visualization is now handled by the unified grid system
+    // This ensures consistent rendering with the grid-based approach
     
-    // Render tower zones
-    if debug_state.show_tower_zones {
-        render_tower_zones(&mut commands, &tower_zones);
-    }
+    // Tower zones are now rendered by the unified grid system
+    // This ensures single source of truth for all grid visualization
     
     // Render debug information overlay
     render_debug_info(&mut commands, &debug_state, &enemy_path, &tower_zones, &grid);
 }
 
-/// Render the grid cells with obstacles
-fn render_grid(
-    commands: &mut Commands,
-    grid: &PathGrid,
-    debug_state: &DebugVisualizationState,
-) {
-    for y in 0..grid.height {
-        for x in 0..grid.width {
-            let grid_pos = GridPos::new(x, y);
-            let world_pos = grid.grid_to_world(grid_pos);
-            let cell_type = grid.get_cell(grid_pos).unwrap_or(CellType::Empty);
-            
-            // Determine cell visualization
-            let (color, size, z_order) = match cell_type {
-                CellType::Empty => {
-                    if debug_state.show_grid {
-                        (Color::srgba(0.3, 0.3, 0.3, 0.3), Vec2::new(62.0, 62.0), -0.1) // Gray outline
-                    } else {
-                        continue; // Skip empty cells if grid not shown
-                    }
-                },
-                CellType::Blocked => {
-                    if debug_state.show_obstacles {
-                        (Color::srgb(0.8, 0.2, 0.2), Vec2::new(60.0, 60.0), 0.1) // Red filled
-                    } else {
-                        continue; // Skip obstacles if not shown
-                    }
-                },
-                CellType::Path => {
-                    (Color::srgb(0.2, 0.8, 0.2), Vec2::new(58.0, 58.0), 0.0) // Green for path cells
-                },
-                CellType::TowerZone => {
-                    (Color::srgb(0.2, 0.2, 0.8), Vec2::new(58.0, 58.0), 0.0) // Blue for tower zones
-                },
-            };
-            
-            // Spawn the visual cell
-            commands.spawn((
-                Sprite {
-                    color,
-                    custom_size: Some(size),
-                    ..default()
-                },
-                Transform::from_translation(world_pos.extend(z_order)),
-                DebugVisualization,
-                GridCell {
-                    grid_pos,
-                    cell_type,
-                },
-            ));
-        }
-    }
-}
+// render_grid function removed - grid visualization now handled by unified grid system
 
-/// Render the enemy path as connected line segments
-fn render_path(
-    commands: &mut Commands,
-    enemy_path: &EnemyPath,
-    _grid: &PathGrid,
-) {
-    // Draw waypoints as small circles
-    for (i, &waypoint) in enemy_path.waypoints.iter().enumerate() {
-        let color = if i == 0 {
-            Color::srgb(0.0, 1.0, 0.0) // Bright green for start
-        } else if i == enemy_path.waypoints.len() - 1 {
-            Color::srgb(1.0, 0.0, 0.0) // Red for end
-        } else {
-            Color::srgb(0.4, 0.8, 0.4) // Medium green for waypoints
-        };
-        
-        commands.spawn((
-            Sprite {
-                color,
-                custom_size: Some(Vec2::new(8.0, 8.0)),
-                ..default()
-            },
-            Transform::from_translation(waypoint.extend(0.2)),
-            DebugVisualization,
-            PathVisualization,
-        ));
-    }
-    
-    // Draw connections between waypoints as line segments
-    for i in 0..enemy_path.waypoints.len() - 1 {
-        let start = enemy_path.waypoints[i];
-        let end = enemy_path.waypoints[i + 1];
-        let midpoint = (start + end) / 2.0;
-        let length = start.distance(end);
-        
-        // Calculate rotation angle
-        let direction = (end - start).normalize();
-        let angle = direction.y.atan2(direction.x);
-        
-        commands.spawn((
-            Sprite {
-                color: Color::srgb(0.0, 0.7, 0.0),
-                custom_size: Some(Vec2::new(length, 3.0)),
-                ..default()
-            },
-            Transform::from_translation(midpoint.extend(0.15))
-                .with_rotation(Quat::from_rotation_z(angle)),
-            DebugVisualization,
-            PathVisualization,
-        ));
-    }
-}
+// Path rendering moved to unified grid system for consistency
+// This eliminates duplicate path visualization and uses grid-based rendering
 
-/// Render tower zones as outlined rectangles
-fn render_tower_zones(
-    commands: &mut Commands,
-    tower_zones: &[TowerZone],
-) {
-    for zone in tower_zones {
-        let (top_left, bottom_right) = zone.world_bounds;
-        let center = (top_left + bottom_right) / 2.0;
-        let size = Vec2::new(
-            (bottom_right.x - top_left.x).abs(),
-            (bottom_right.y - top_left.y).abs(),
-        );
-        
-        // Render zone outline
-        commands.spawn((
-            Sprite {
-                color: Color::srgba(0.2, 0.2, 0.8, 0.3),
-                custom_size: Some(size),
-                ..default()
-            },
-            Transform::from_translation(center.extend(0.05)),
-            DebugVisualization,
-            TowerZoneVisualization,
-        ));
-        
-        // Add a small marker showing strategic value
-        let value_color = if zone.strategic_value > 0.7 {
-            Color::srgb(1.0, 0.8, 0.0) // Gold for high value
-        } else if zone.strategic_value > 0.4 {
-            Color::srgb(0.8, 0.8, 0.0) // Yellow for medium value
-        } else {
-            Color::srgb(0.6, 0.6, 0.6) // Gray for low value
-        };
-        
-        commands.spawn((
-            Sprite {
-                color: value_color,
-                custom_size: Some(Vec2::new(6.0, 6.0)),
-                ..default()
-            },
-            Transform::from_translation(center.extend(0.1)),
-            DebugVisualization,
-            TowerZoneVisualization,
-        ));
-    }
-}
+// Tower zone rendering moved to unified grid system for consistency
+// This eliminates duplicate visualization and ensures single source of truth
 
 /// Render comprehensive debug information overlay
 fn render_debug_info(

@@ -41,29 +41,30 @@ impl WaveStatus {
 // SYSTEMS
 // ============================================================================
 
-/// System 1: Tower Targeting - Find closest enemies in range
+/// System 1: Tower Targeting - Find enemies closest to end within range
 pub fn tower_targeting_system(
     mut towers: Query<(&mut Target, &TowerStats, &Transform), With<TowerStats>>,
-    enemies: Query<(Entity, &Transform), (With<Enemy>, Without<TowerStats>)>,
+    enemies: Query<(Entity, &Transform, &PathProgress), (With<Enemy>, Without<TowerStats>)>,
 ) {
     for (mut target, stats, tower_transform) in towers.iter_mut() {
         let tower_pos = tower_transform.translation.truncate();
         
-        // Find closest enemy within range
-        let mut closest_enemy = None;
-        let mut closest_distance = f32::MAX;
+        // Find enemy closest to end (highest progress) within range
+        let mut best_target = None;
+        let mut highest_progress = -1.0;
         
-        for (enemy_entity, enemy_transform) in enemies.iter() {
+        for (enemy_entity, enemy_transform, path_progress) in enemies.iter() {
             let enemy_pos = enemy_transform.translation.truncate();
             let distance = tower_pos.distance(enemy_pos);
             
-            if distance <= stats.range && distance < closest_distance {
-                closest_distance = distance;
-                closest_enemy = Some(enemy_entity);
+            // Check if enemy is in range and closer to end than current best
+            if distance <= stats.range && path_progress.current > highest_progress {
+                highest_progress = path_progress.current;
+                best_target = Some(enemy_entity);
             }
         }
         
-        target.entity = closest_enemy;
+        target.entity = best_target;
     }
 }
 
@@ -240,6 +241,11 @@ pub fn game_state_system(
     enemies: Query<(Entity, &Transform), With<Enemy>>,
     enemy_path: Res<EnemyPath>,
 ) {
+    // Skip all game logic if already in terminal state to prevent spam
+    if matches!(*game_state, GameState::GameOver | GameState::Victory) {
+        return;
+    }
+    
     // Check for enemies that have reached the end of the path
     let mut enemies_to_remove = Vec::new();
     let mut new_escapes = 0;

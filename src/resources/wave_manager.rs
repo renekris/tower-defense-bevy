@@ -82,6 +82,28 @@ impl WaveManager {
         self.current_wave += 1;
         self.enemies_in_wave = enemy_count;
         self.enemies_spawned = 0;
+        
+        // Scale spawn rate based on wave number for increased intensity
+        let spawn_rate = self.calculate_spawn_rate_for_wave();
+        self.set_spawn_rate(spawn_rate);
+    }
+    
+    /// Calculate appropriate spawn rate for current wave
+    /// Higher waves spawn enemies faster for increased pressure
+    fn calculate_spawn_rate_for_wave(&self) -> f32 {
+        let wave = self.current_wave.max(1) as f32;
+        
+        // Progressive spawn rate scaling:
+        // Wave 1: 1.0 (1 enemy per second)
+        // Wave 2: 1.2 (1 enemy per 0.83 seconds)  
+        // Wave 3: 1.4 (1 enemy per 0.71 seconds)
+        // Wave 10: 2.8 (1 enemy per 0.36 seconds)
+        // Formula: 1.0 + (wave - 1) * 0.2, capped at 3.0
+        let base_rate = 1.0;
+        let scaling_factor = 0.2;
+        let max_rate = 3.0;
+        
+        (base_rate + (wave - 1.0) * scaling_factor).min(max_rate)
     }
 
     /// Check if all enemies in the current wave have been spawned
