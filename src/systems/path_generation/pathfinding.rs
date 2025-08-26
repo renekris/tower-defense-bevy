@@ -186,16 +186,16 @@ pub fn validate_strategic_path_requirements(path: &[GridPos], grid_width: usize,
         }
     }
     
-    // Must have between 3-5 turns
+    // Must have at least 3 turns, but allow more for complex paths
     let turn_count = count_direction_changes(path);
-    if turn_count < 3 || turn_count > 5 {
+    if turn_count < 3 {
         return false;
     }
     
-    // Check connectivity (no large jumps)
+    // Check connectivity (no large jumps) - allow longer jumps for dense grid
     for i in 0..path.len() - 1 {
         let dist = path[i].manhattan_distance(&path[i + 1]);
-        if dist > 6.0 {  // Allow reasonable jumps for strategic paths
+        if dist > 10.0 {  // Allow jumps up to 10 steps for 32-wide grid
             return false;
         }
     }
