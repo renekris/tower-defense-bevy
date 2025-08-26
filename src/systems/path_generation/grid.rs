@@ -86,11 +86,16 @@ impl PathGrid {
         Self {
             width,
             height,
-            cell_size: 64.0, // Matches existing tower placement grid
+            cell_size: 40.0, // Matches dense unified grid cell size
             cells,
             entry_point: GridPos::new(0, height / 2),
             exit_point: GridPos::new(width - 1, height / 2),
         }
+    }
+    
+    /// Create a new grid using dense unified grid system dimensions (32x18)
+    pub fn new_unified() -> Self {
+        Self::new(32, 18)
     }
     
     /// Get cell type at grid position (bounds-checked)
@@ -122,20 +127,33 @@ impl PathGrid {
     }
     
     /// Convert grid coordinates to world coordinates (center of cell)
+    /// Uses unified grid coordinate system for consistency
     pub fn grid_to_world(&self, grid_pos: GridPos) -> Vec2 {
-        // Calculate world position relative to screen center
-        let world_x = (grid_pos.x as f32 * self.cell_size) - (self.width as f32 * self.cell_size / 2.0) + (self.cell_size / 2.0);
-        let world_y = (grid_pos.y as f32 * self.cell_size) - (self.height as f32 * self.cell_size / 2.0) + (self.cell_size / 2.0);
+        let grid_offset = Vec2::new(
+            -(self.width as f32 * self.cell_size) / 2.0,
+            -(self.height as f32 * self.cell_size) / 2.0,
+        );
         
-        Vec2::new(world_x, world_y)
+        grid_offset + Vec2::new(
+            grid_pos.x as f32 * self.cell_size + self.cell_size / 2.0,
+            grid_pos.y as f32 * self.cell_size + self.cell_size / 2.0,
+        )
     }
     
     /// Convert world coordinates to grid coordinates
+    /// Uses unified grid coordinate system for consistency
     pub fn world_to_grid(&self, world_pos: Vec2) -> Option<GridPos> {
-        let grid_x = ((world_pos.x + (self.width as f32 * self.cell_size / 2.0)) / self.cell_size).floor() as i32;
-        let grid_y = ((world_pos.y + (self.height as f32 * self.cell_size / 2.0)) / self.cell_size).floor() as i32;
+        let grid_offset = Vec2::new(
+            -(self.width as f32 * self.cell_size) / 2.0,
+            -(self.height as f32 * self.cell_size) / 2.0,
+        );
         
-        if grid_x >= 0 && grid_x < self.width as i32 && grid_y >= 0 && grid_y < self.height as i32 {
+        let relative_pos = world_pos - grid_offset;
+        let grid_x = (relative_pos.x / self.cell_size).floor() as i32;
+        let grid_y = (relative_pos.y / self.cell_size).floor() as i32;
+        
+        if grid_x >= 0 && grid_x < self.width as i32 && 
+           grid_y >= 0 && grid_y < self.height as i32 {
             Some(GridPos::new(grid_x as usize, grid_y as usize))
         } else {
             None
