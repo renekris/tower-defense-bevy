@@ -2,6 +2,7 @@ use bevy::prelude::*;
 use crate::resources::*;
 use crate::systems::path_generation::*;
 use crate::systems::unified_grid::{UnifiedGridSystem, GridVisualizationMode};
+use crate::systems::security::{SecurityContext, DebugFeatureFlags, DebugAuthorization};
 
 /// Resource to track debug visualization state
 #[derive(Resource, Default)]
@@ -71,11 +72,21 @@ pub fn f1_debug_visualization_toggle(
     mut debug_state: ResMut<DebugVisualizationState>,
     mut unified_grid: ResMut<UnifiedGridSystem>,
     keyboard_input: Res<ButtonInput<KeyCode>>,
+    security_context: Res<SecurityContext>,
+    feature_flags: Res<DebugFeatureFlags>,
 ) {
     if keyboard_input.just_pressed(KeyCode::F1) {
+        // Security check: Validate debug visualization access
+        if !DebugAuthorization::validate_debug_visualization_access(&security_context, &feature_flags) {
+            return; // Access denied - validation already logged warning
+        }
+        
         debug_state.toggle();
         if debug_state.enabled {
-            println!("Debug visualization enabled (F1 to toggle, Ctrl+1-9 for wave selection)");
+            // Secure console output - only if permitted
+            if DebugAuthorization::validate_console_output_access(&security_context, &feature_flags) {
+                println!("Debug visualization enabled (F1 to toggle, Ctrl+1-9 for wave selection)");
+            }
             // Switch to debug mode when debug visualization is enabled
             // unless we're currently in placement mode
             if unified_grid.mode != GridVisualizationMode::Placement {

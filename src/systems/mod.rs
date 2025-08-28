@@ -9,6 +9,7 @@ pub mod input;
 pub mod path_generation;
 pub mod debug_visualization;
 pub mod debug_ui;
+pub mod security;
 pub mod tower_ui;
 pub mod tower_rendering;
 pub mod unified_grid;

@@ -62,6 +62,7 @@ fn main() {
         // Add BRP Extras plugin (includes RemotePlugin for MCP server integration)
         .add_plugins(BrpExtrasPlugin)
         // Add custom plugins
+        .add_plugins(tower_defense_bevy::systems::security::SecurityPlugin) // Security and authorization
         .add_plugins(InputRegistryPlugin::default()) // Centralized input handling
         .add_plugins(DebugUIPlugin)
         .add_plugins(ObstacleRenderingPlugin)
