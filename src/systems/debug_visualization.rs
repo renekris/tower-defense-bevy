@@ -55,8 +55,19 @@ pub struct TowerZoneVisualization;
 #[derive(Component)]
 pub struct DebugInfoText;
 
-/// System to handle debug visualization toggle input
-pub fn debug_toggle_system(
+/// F1 key handler: Toggle debug visualization and switch to debug grid mode
+/// 
+/// **Function**: `f1_debug_visualization_toggle()`
+/// **F-Key**: F1
+/// **Purpose**: Toggle debug visualization overlays and enable debug grid mode
+/// **Dependencies**: DebugVisualizationState, UnifiedGridSystem
+/// **Side Effects**: 
+/// - Toggles debug_state.enabled
+/// - Switches grid mode to Debug when enabled
+/// - Enables path, zones, and obstacles visualization
+/// - Switches back to Normal grid mode when disabled
+/// **Integration**: Works with InputMappingRegistry for centralized F-key management
+pub fn f1_debug_visualization_toggle(
     mut debug_state: ResMut<DebugVisualizationState>,
     mut unified_grid: ResMut<UnifiedGridSystem>,
     keyboard_input: Res<ButtonInput<KeyCode>>,

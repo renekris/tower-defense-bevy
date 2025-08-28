@@ -259,8 +259,19 @@ pub fn grid_to_world(grid_pos: GridPos, unified_grid: &UnifiedGridSystem) -> Vec
     )
 }
 
-/// System to handle grid mode switching with F3 key
-pub fn grid_mode_toggle_system(
+/// F3 key handler: Cycle through grid visualization modes
+/// 
+/// **Function**: `f3_grid_mode_cycle()`
+/// **F-Key**: F3
+/// **Purpose**: Cycle grid visualization mode (Normal → Debug → Placement → Normal)
+/// **Dependencies**: UnifiedGridSystem
+/// **Side Effects**: 
+/// - Changes unified_grid.mode in cyclic order
+/// - Normal: Subtle grid lines for tower placement guidance
+/// - Debug: Shows pathfinding data (obstacles, paths, tower zones)
+/// - Placement: Highlights valid/invalid tower placement areas
+/// **Integration**: Works with InputMappingRegistry for centralized F-key management
+pub fn f3_grid_mode_cycle(
     keyboard_input: Res<ButtonInput<KeyCode>>,
     mut unified_grid: ResMut<UnifiedGridSystem>,
 ) {
@@ -273,7 +284,23 @@ pub fn grid_mode_toggle_system(
         
         info!("Grid visualization mode changed to: {:?}", unified_grid.mode);
     }
-    
+}
+
+/// F4 key handler: Toggle grid border visibility
+/// 
+/// **Function**: `f4_grid_border_toggle()`
+/// **F-Key**: F4
+/// **Purpose**: Toggle grid border visibility completely on/off
+/// **Dependencies**: UnifiedGridSystem
+/// **Side Effects**: 
+/// - Toggles unified_grid.hide_grid_borders
+/// - When true: All grid borders hidden (Color::NONE)
+/// - When false: Grid borders visible according to current mode
+/// **Integration**: Works with InputMappingRegistry for centralized F-key management
+pub fn f4_grid_border_toggle(
+    keyboard_input: Res<ButtonInput<KeyCode>>,
+    mut unified_grid: ResMut<UnifiedGridSystem>,
+) {
     if keyboard_input.just_pressed(KeyCode::F4) {
         unified_grid.hide_grid_borders = !unified_grid.hide_grid_borders;
         info!("Grid borders visibility toggled: {}", 

@@ -5,8 +5,18 @@ use crate::systems::debug_visualization::DebugVisualizationState;
 use crate::systems::unified_grid::UnifiedGridSystem;
 use super::components::*;
 
-/// System to handle F2 key toggle for debug UI
-pub fn debug_ui_toggle_system(
+/// F2 key handler: Toggle debug UI panel visibility
+/// 
+/// **Function**: `f2_debug_ui_panel_toggle()`
+/// **F-Key**: F2
+/// **Purpose**: Toggle the debug UI panel visibility on/off
+/// **Dependencies**: DebugUIState
+/// **Side Effects**: 
+/// - Toggles ui_state.panel_visible
+/// - Shows/hides the entire debug UI panel
+/// - Prints status message to console
+/// **Integration**: Works with InputMappingRegistry for centralized F-key management
+pub fn f2_debug_ui_panel_toggle(
     keyboard_input: Res<ButtonInput<KeyCode>>,
     mut ui_state: ResMut<DebugUIState>,
 ) {

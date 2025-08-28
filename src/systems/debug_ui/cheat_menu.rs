@@ -134,8 +134,18 @@ pub struct CheatSliderDragState {
 
 // System functions
 
-/// System to handle F9 key toggle for cheat menu
-pub fn cheat_menu_toggle_system(
+/// F9 key handler: Toggle cheat menu visibility
+/// 
+/// **Function**: `f9_cheat_menu_toggle()`
+/// **F-Key**: F9
+/// **Purpose**: Toggle the cheat menu panel visibility on/off
+/// **Dependencies**: CheatMenuState
+/// **Side Effects**: 
+/// - Toggles cheat_state.visible
+/// - Shows/hides the cheat menu overlay panel
+/// - Provides access to currency cheats, stat multipliers, and game state controls
+/// **Integration**: Works with InputMappingRegistry for centralized F-key management
+pub fn f9_cheat_menu_toggle(
     keyboard_input: Res<ButtonInput<KeyCode>>,
     mut cheat_state: ResMut<CheatMenuState>,
 ) {

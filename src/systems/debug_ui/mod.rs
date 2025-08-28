@@ -16,7 +16,11 @@ pub use plugin::DebugUIPlugin;
 pub use components::{DebugUIState, DebugUIPanel};
 pub use cheat_menu::{CheatMenuState, CheatMultipliers, CheatMenuPanel};
 
-// Re-export key functions for backward compatibility
-pub use interactions::debug_ui_toggle_system;
+// Re-export key functions with standardized names
+pub use interactions::f2_debug_ui_panel_toggle;
 pub use setup::setup_debug_ui;
-pub use cheat_menu::{cheat_menu_toggle_system, setup_cheat_menu};
+pub use cheat_menu::{f9_cheat_menu_toggle, setup_cheat_menu};
+
+// DEPRECATED: Legacy function names for backward compatibility (will be removed)
+pub use interactions::f2_debug_ui_panel_toggle as debug_ui_toggle_system;
+pub use cheat_menu::f9_cheat_menu_toggle as cheat_menu_toggle_system;
