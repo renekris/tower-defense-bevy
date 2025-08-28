@@ -11,8 +11,10 @@ use systems::enemy_system::{enemy_spawning_system, enemy_movement_system, enemy_
 use systems::input_system::{mouse_input_system, tower_placement_system, tower_placement_preview_system, MouseInputState, auto_grid_mode_system};
 use systems::ui_system::{update_ui_system};
 use systems::combat_system::{tower_targeting_system, projectile_spawning_system, projectile_movement_system, collision_system, game_state_system, WaveStatus};
-use systems::debug_visualization::{DebugVisualizationState, debug_toggle_system, debug_visualization_system};
-use systems::debug_ui::{DebugUIState, debug_ui_toggle_system, setup_debug_ui, DebugUIPlugin};
+use systems::debug_visualization::{DebugVisualizationState, debug_visualization_system};
+use systems::debug_ui::{DebugUIState, setup_debug_ui, DebugUIPlugin};
+use systems::debug_ui::cheat_menu::CheatMenuState;
+use systems::input::InputRegistryPlugin;
 use systems::enemy_system::{manual_wave_system, path_generation_system, path_visualization_system, StartWaveEvent};
 use systems::tower_ui::{
     TowerSelectionState, 
@@ -39,7 +41,6 @@ use systems::unified_grid::{
     UnifiedGridSystem,
     setup_unified_grid,
     update_grid_visualization,
-    grid_mode_toggle_system,
 };
 use systems::obstacle_rendering::ObstacleRenderingPlugin;
 use systems::tower_rendering::TowerRenderingPlugin;
@@ -61,6 +62,7 @@ fn main() {
         // Add BRP Extras plugin (includes RemotePlugin for MCP server integration)
         .add_plugins(BrpExtrasPlugin)
         // Add custom plugins
+        .add_plugins(InputRegistryPlugin::default()) // Centralized input handling
         .add_plugins(DebugUIPlugin)
         .add_plugins(ObstacleRenderingPlugin)
         .add_plugins(TowerRenderingPlugin)
@@ -77,6 +79,7 @@ fn main() {
         .init_resource::<MouseInputState>()
         .init_resource::<WaveStatus>()
         .init_resource::<DebugVisualizationState>()
+        .init_resource::<CheatMenuState>()
         .init_resource::<TowerSelectionState>()
         .init_resource::<TowerStatPopupState>()
         .init_resource::<UnifiedGridSystem>()
@@ -122,11 +125,9 @@ fn main() {
             
             // Grid visualization systems
             auto_grid_mode_system,
-            grid_mode_toggle_system,
             update_grid_visualization,
             
             // Debug visualization systems
-            debug_toggle_system,
             debug_visualization_system,
             
             // Combat systems (ORDER CRITICAL - dependency chain)
