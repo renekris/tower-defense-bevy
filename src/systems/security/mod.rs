@@ -9,7 +9,7 @@ pub mod admin_toggle;
 pub use context::*;
 pub use features::*;
 pub use validation::*;
-pub use admin_toggle::*;
+pub use admin_toggle::{admin_toggle_system, initialize_admin_from_settings, admin_status_display_system, deferred_admin_settings_load};
 
 use bevy::prelude::*;
 
@@ -26,6 +26,7 @@ impl Plugin for SecurityPlugin {
                validate_security_context,
                admin_toggle_system,
                admin_status_display_system,
+               deferred_admin_settings_load,
            ));
 
         // Log security initialization

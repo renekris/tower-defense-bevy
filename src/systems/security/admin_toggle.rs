@@ -48,22 +48,61 @@ pub fn admin_toggle_system(
 pub fn initialize_admin_from_settings(
     mut security_context: ResMut<SecurityContext>,
     mut feature_flags: ResMut<DebugFeatureFlags>,
-    settings: Res<GameSettings>,
+    settings: Option<Res<GameSettings>>,
 ) {
     // Only in development builds
     if !security_context.development_build {
         return;
     }
     
-    if settings.debug_admin_enabled {
-        security_context.authorize_debug_access();
-        security_context.authorize_admin_privileges();
-        feature_flags.enable_admin_features();
-        
-        info!("🔑 Admin privileges restored from settings - Full F-key access available");
-        info!("   Press ` (backtick) to toggle admin mode");
+    // Check if settings are available yet (they might not be loaded during early startup)
+    if let Some(settings) = settings {
+        if settings.debug_admin_enabled {
+            security_context.authorize_debug_access();
+            security_context.authorize_admin_privileges();
+            feature_flags.enable_admin_features();
+            
+            info!("🔑 Admin privileges restored from settings - Full F-key access available");
+            info!("   Press ` (backtick) to toggle admin mode");
+        } else {
+            info!("🔒 Admin mode disabled - Press ` (backtick) to enable full F-key access");
+        }
     } else {
-        info!("🔒 Admin mode disabled - Press ` (backtick) to enable full F-key access");
+        // Settings not available yet - just show admin toggle instructions
+        info!("🔒 Settings loading... Press ` (backtick) to toggle admin mode when ready");
+    }
+}
+
+/// Deferred system to load admin settings once GameSettings is available
+/// This runs after the main initialization to properly load admin preferences
+pub fn deferred_admin_settings_load(
+    mut security_context: ResMut<SecurityContext>,
+    mut feature_flags: ResMut<DebugFeatureFlags>, 
+    settings: Option<Res<GameSettings>>,
+) {
+    // Only in development builds
+    if !security_context.development_build {
+        return;
+    }
+    
+    // Only run if we haven't already loaded admin settings
+    static mut ADMIN_SETTINGS_LOADED: bool = false;
+    unsafe {
+        if ADMIN_SETTINGS_LOADED {
+            return;
+        }
+        ADMIN_SETTINGS_LOADED = true;
+    }
+    
+    // Check if settings are available and load admin preferences
+    if let Some(settings) = settings {
+        if settings.debug_admin_enabled && !security_context.admin_privileges {
+            security_context.authorize_debug_access();
+            security_context.authorize_admin_privileges();
+            feature_flags.enable_admin_features();
+            
+            info!("🔑 Deferred admin privileges loaded from settings - Full F-key access available");
+        }
     }
 }
 
