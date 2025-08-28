@@ -25,6 +25,7 @@ pub struct UnifiedGridSystem {
     pub show_path: bool,
     pub show_zones: bool,
     pub show_obstacles: bool,
+    pub hide_grid_borders: bool, // F4 toggle for completely hiding grid borders
 }
 
 impl UnifiedGridSystem {
@@ -56,6 +57,7 @@ impl Default for UnifiedGridSystem {
             show_path: true,
             show_zones: true,
             show_obstacles: true,
+            hide_grid_borders: false, // Grid borders visible by default
         }
     }
 }
@@ -137,66 +139,70 @@ pub fn update_grid_visualization(
     }
 
     for (grid_tile, mut sprite) in sprite_query.iter_mut() {
-        let color = match unified_grid.mode {
-            GridVisualizationMode::Normal => {
-                // Always show grid lines for dense grid system
-                // Bright enough to be clearly visible but not dominating
-                Color::srgba(0.7, 0.7, 0.7, 0.4)
-            },
-            GridVisualizationMode::Debug => {
-                if let Some(path_grid) = &path_grid {
-                    let cell_type = path_grid.get_cell(grid_tile.grid_pos)
-                        .unwrap_or(CellType::Empty);
-                    
-                    match cell_type {
-                        CellType::Empty => {
-                            if unified_grid.show_grid {
-                                Color::srgba(0.0, 1.0, 0.0, 0.3) // Light green - valid placement
-                            } else {
-                                Color::NONE
-                            }
-                        },
-                        CellType::Blocked => {
-                            if unified_grid.show_obstacles {
-                                Color::srgba(1.0, 0.0, 0.0, 0.7) // Bright red obstacles - invalid placement
-                            } else {
-                                Color::srgba(0.3, 0.3, 0.3, 0.3) // Gray outline when hidden
-                            }
-                        },
-                        CellType::Path => {
-                            if unified_grid.show_path {
-                                Color::srgba(1.0, 0.0, 0.0, 0.6) // Red path - invalid placement
-                            } else {
-                                Color::srgba(0.3, 0.3, 0.3, 0.3) // Gray outline when hidden
-                            }
-                        },
-                        CellType::TowerZone => {
-                            if unified_grid.show_zones {
-                                Color::srgba(0.2, 0.2, 0.8, 0.8) // Blue tower zones
-                            } else {
-                                Color::srgba(0.3, 0.3, 0.3, 0.3) // Gray outline when hidden
+        let color = if unified_grid.hide_grid_borders {
+            Color::NONE // F4 key completely hides all grid borders
+        } else {
+            match unified_grid.mode {
+                GridVisualizationMode::Normal => {
+                    // Always show grid lines for dense grid system
+                    // Bright enough to be clearly visible but not dominating
+                    Color::srgba(0.7, 0.7, 0.7, 0.4)
+                },
+                GridVisualizationMode::Debug => {
+                    if let Some(path_grid) = &path_grid {
+                        let cell_type = path_grid.get_cell(grid_tile.grid_pos)
+                            .unwrap_or(CellType::Empty);
+                        
+                        match cell_type {
+                            CellType::Empty => {
+                                if unified_grid.show_grid {
+                                    Color::srgba(0.0, 1.0, 0.0, 0.3) // Light green - valid placement
+                                } else {
+                                    Color::srgba(0.7, 0.7, 0.7, 0.4) // Default grid border when debug overlay hidden
+                                }
+                            },
+                            CellType::Blocked => {
+                                if unified_grid.show_obstacles {
+                                    Color::srgba(1.0, 0.0, 0.0, 0.7) // Bright red obstacles - invalid placement
+                                } else {
+                                    Color::srgba(0.7, 0.7, 0.7, 0.4) // Default grid border when obstacles hidden
+                                }
+                            },
+                            CellType::Path => {
+                                if unified_grid.show_path {
+                                    Color::srgba(1.0, 0.0, 0.0, 0.6) // Red path - invalid placement
+                                } else {
+                                    Color::srgba(0.7, 0.7, 0.7, 0.4) // Default grid border when path hidden
+                                }
+                            },
+                            CellType::TowerZone => {
+                                if unified_grid.show_zones {
+                                    Color::srgba(0.2, 0.2, 0.8, 0.8) // Blue tower zones
+                                } else {
+                                    Color::srgba(0.7, 0.7, 0.7, 0.4) // Default grid border when zones hidden
+                                }
                             }
                         }
+                    } else {
+                        Color::srgba(0.7, 0.7, 0.7, 0.4) // Default grid border if no PathGrid
                     }
-                } else {
-                    Color::srgba(0.3, 0.3, 0.3, 0.3) // Default gray if no PathGrid
+                },
+                GridVisualizationMode::Placement => {
+                    // Determine if this cell is a valid placement location using the correct logic
+                    let is_valid_placement = is_valid_placement_cell(
+                        grid_tile.grid_pos,
+                        &path_grid,
+                        unified_grid.grid_width,
+                        unified_grid.grid_height,
+                    );
+                    
+                    if is_valid_placement {
+                        Color::srgba(0.0, 1.0, 0.0, 0.3) // Green for valid placement
+                    } else {
+                        Color::srgba(1.0, 0.0, 0.0, 0.2) // Red for invalid placement (more subtle)
+                    }
                 }
-            },
-            GridVisualizationMode::Placement => {
-                // Determine if this cell is a valid placement location using the correct logic
-                let is_valid_placement = is_valid_placement_cell(
-                    grid_tile.grid_pos,
-                    &path_grid,
-                    unified_grid.grid_width,
-                    unified_grid.grid_height,
-                );
-                
-                if is_valid_placement {
-                    Color::srgba(0.0, 1.0, 0.0, 0.3) // Green for valid placement
-                } else {
-                    Color::srgba(1.0, 0.0, 0.0, 0.2) // Red for invalid placement (more subtle)
-                }
-            },
+            }
         };
         
         sprite.color = color;
@@ -269,8 +275,9 @@ pub fn grid_mode_toggle_system(
     }
     
     if keyboard_input.just_pressed(KeyCode::F4) {
-        unified_grid.show_grid = !unified_grid.show_grid;
-        info!("Grid visibility toggled: {}", unified_grid.show_grid);
+        unified_grid.hide_grid_borders = !unified_grid.hide_grid_borders;
+        info!("Grid borders visibility toggled: {}", 
+            if unified_grid.hide_grid_borders { "hidden" } else { "visible" });
     }
 }
 
