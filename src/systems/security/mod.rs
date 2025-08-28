@@ -9,7 +9,7 @@ pub mod admin_toggle;
 pub use context::*;
 pub use features::*;
 pub use validation::*;
-pub use admin_toggle::{admin_toggle_system, initialize_admin_from_settings, admin_status_display_system, deferred_admin_settings_load};
+pub use admin_toggle::{AdminToggleEvent, admin_toggle_system, admin_settings_persistence_system, initialize_admin_from_settings, admin_status_display_system, deferred_admin_settings_load};
 
 use bevy::prelude::*;
 
@@ -21,13 +21,15 @@ impl Plugin for SecurityPlugin {
         // Initialize security resources with secure defaults
         app.init_resource::<SecurityContext>()
            .init_resource::<DebugFeatureFlags>()
+           .add_event::<AdminToggleEvent>()
            .add_systems(Startup, (initialize_security_context, initialize_admin_from_settings).chain())
            .add_systems(Update, (
                validate_security_context,
                admin_toggle_system,
                admin_status_display_system,
                deferred_admin_settings_load,
-           ));
+           ))
+           .add_systems(Update, admin_settings_persistence_system.in_set(crate::resources::GameSystemSet::Settings));
 
         // Log security initialization
         info!("Security system initialized with secure defaults");

@@ -2,13 +2,19 @@ use bevy::prelude::*;
 use crate::systems::settings_menu::GameSettings;
 use super::{SecurityContext, DebugFeatureFlags};
 
+/// Event for admin privilege changes
+#[derive(Event)]
+pub struct AdminToggleEvent {
+    pub enabled: bool,
+}
+
 /// System to handle backtick (`) key toggle for admin privileges
-/// Toggles admin mode and persists the setting to settings.json
+/// Toggles admin mode and sends event for settings persistence
 pub fn admin_toggle_system(
     keyboard_input: Res<ButtonInput<KeyCode>>,
     mut security_context: ResMut<SecurityContext>,
     mut feature_flags: ResMut<DebugFeatureFlags>,
-    mut settings: Option<ResMut<GameSettings>>,
+    mut admin_events: EventWriter<AdminToggleEvent>,
 ) {
     // Only process in development builds for security
     if !security_context.development_build {
@@ -25,14 +31,6 @@ pub fn admin_toggle_system(
             security_context.authorize_admin_privileges();
             feature_flags.enable_admin_features();
             
-            // Save to settings if available
-            if let Some(ref mut settings) = settings {
-                settings.debug_admin_enabled = true;
-                info!("💾 Admin preference saved to settings.json");
-            } else {
-                info!("⚠️ Settings not available - admin state not persisted");
-            }
-            
             info!("🔑 Admin privileges ENABLED - Full F-key access granted (` to toggle)");
             info!("   F1: Debug Visualization | F2: Debug UI | F3: Grid Mode | F4: Grid Borders");
             info!("   F9: Cheat Menu | 1-5: Spawn Rate | Ctrl+1-9: Wave Selection");
@@ -41,16 +39,29 @@ pub fn admin_toggle_system(
             security_context.admin_privileges = false;
             feature_flags.cheat_menu_enabled = false;
             
-            // Save to settings if available
-            if let Some(ref mut settings) = settings {
-                settings.debug_admin_enabled = false;
-                info!("💾 Admin preference saved to settings.json");
-            } else {
-                info!("⚠️ Settings not available - admin state not persisted");
-            }
-            
             info!("🔒 Admin privileges DISABLED - Cheat menu (F9) locked (` to toggle)");
             info!("   F1-F4 and debug features still available");
+        }
+        
+        // Send event to update settings - no direct resource access conflict
+        admin_events.write(AdminToggleEvent {
+            enabled: new_admin_state,
+        });
+        info!("💾 Admin preference queued for auto-save");
+    }
+}
+
+/// System to handle admin settings persistence
+pub fn admin_settings_persistence_system(
+    mut admin_events: EventReader<AdminToggleEvent>,
+    mut settings: Option<ResMut<GameSettings>>,
+) {
+    for event in admin_events.read() {
+        if let Some(ref mut settings) = settings {
+            settings.debug_admin_enabled = event.enabled;
+            info!("💾 Admin preference persisted via event system");
+        } else {
+            info!("⚠️ Settings temporarily unavailable for event persistence");
         }
     }
 }
@@ -66,21 +77,24 @@ pub fn initialize_admin_from_settings(
         return;
     }
     
-    // Check if settings are available yet (they might not be loaded during early startup)
-    if let Some(settings) = settings {
-        if settings.debug_admin_enabled {
-            security_context.authorize_debug_access();
-            security_context.authorize_admin_privileges();
-            feature_flags.enable_admin_features();
-            
-            info!("🔑 Admin privileges restored from settings - Full F-key access available");
-            info!("   Press ` (backtick) to toggle admin mode");
-        } else {
-            info!("🔒 Admin mode disabled - Press ` (backtick) to enable full F-key access");
+    // Try to load settings, but gracefully handle if they're not available
+    match settings {
+        Some(ref settings) => {
+            if settings.debug_admin_enabled {
+                security_context.authorize_debug_access();
+                security_context.authorize_admin_privileges();
+                feature_flags.enable_admin_features();
+                
+                info!("🔑 Admin privileges restored from settings - Full F-key access available");
+                info!("   Press ` (backtick) to toggle admin mode");
+            } else {
+                info!("🔒 Admin mode disabled - Press ` (backtick) to enable full F-key access");
+            }
         }
-    } else {
-        // Settings not available yet - just show admin toggle instructions
-        info!("🔒 Settings loading... Press ` (backtick) to toggle admin mode when ready");
+        None => {
+            // Settings not available yet - use safe defaults and show admin toggle instructions
+            info!("🔒 Settings not yet loaded - Using defaults. Press ` (backtick) to enable admin mode");
+        }
     }
 }
 
@@ -105,14 +119,20 @@ pub fn deferred_admin_settings_load(
         ADMIN_SETTINGS_LOADED = true;
     }
     
-    // Check if settings are available and load admin preferences
-    if let Some(settings) = settings {
-        if settings.debug_admin_enabled && !security_context.admin_privileges {
-            security_context.authorize_debug_access();
-            security_context.authorize_admin_privileges();
-            feature_flags.enable_admin_features();
-            
-            info!("🔑 Deferred admin privileges loaded from settings - Full F-key access available");
+    // Try to load admin preferences if settings are available
+    match settings {
+        Some(ref settings) => {
+            if settings.debug_admin_enabled && !security_context.admin_privileges {
+                security_context.authorize_debug_access();
+                security_context.authorize_admin_privileges();
+                feature_flags.enable_admin_features();
+                
+                info!("🔑 Deferred admin privileges loaded from settings - Full F-key access available");
+            }
+        }
+        None => {
+            // Settings still not available - this is OK, admin toggle will still work
+            debug!("Deferred admin settings load: GameSettings not yet available");
         }
     }
 }

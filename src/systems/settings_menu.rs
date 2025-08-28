@@ -864,7 +864,7 @@ pub struct SettingsSystemPlugin;
 impl Plugin for SettingsSystemPlugin {
     fn build(&self, app: &mut App) {
         app
-            .insert_resource(GameSettings::load())
+            // GameSettings resource is now loaded earlier in main.rs to ensure availability
             .add_systems(Startup, (setup_settings_menu, apply_loaded_settings_to_window))
             .add_systems(
                 Update,
