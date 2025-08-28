@@ -64,7 +64,7 @@ pub fn debug_toggle_system(
     if keyboard_input.just_pressed(KeyCode::F1) {
         debug_state.toggle();
         if debug_state.enabled {
-            println!("Debug visualization enabled (F1 to toggle)");
+            println!("Debug visualization enabled (F1 to toggle, Ctrl+1-9 for wave selection)");
             // Switch to debug mode when debug visualization is enabled
             // unless we're currently in placement mode
             if unified_grid.mode != GridVisualizationMode::Placement {
@@ -84,8 +84,9 @@ pub fn debug_toggle_system(
         }
     }
     
-    // Allow changing wave number with number keys when debug is enabled
-    if debug_state.enabled {
+    // Allow changing wave number with Ctrl+number keys when debug is enabled
+    // This prevents conflict with debug UI spawn rate controls (keys 1-5)
+    if debug_state.enabled && (keyboard_input.pressed(KeyCode::ControlLeft) || keyboard_input.pressed(KeyCode::ControlRight)) {
         for (key, wave) in [
             (KeyCode::Digit1, 1),
             (KeyCode::Digit2, 2),
@@ -99,7 +100,7 @@ pub fn debug_toggle_system(
         ] {
             if keyboard_input.just_pressed(key) {
                 debug_state.current_wave = wave;
-                println!("Debug: Switched to wave {}", wave);
+                println!("Debug: Switched to wave {} (Ctrl+{})", wave, wave);
             }
         }
     }

@@ -272,30 +272,31 @@ pub fn handle_debug_keyboard_shortcuts(
     }
     
     // Number keys 1-5 - Quick adjust spawn rate (1=slow, 5=fast)
+    // Note: Debug visualization uses Ctrl+1-9 for wave selection to avoid conflicts
     if keyboard_input.just_pressed(KeyCode::Digit1) {
         ui_state.enemy_spawn_rate = 0.5; // Slow
         ui_state.set_changed();
-        println!("Keyboard shortcut: Spawn rate set to SLOW (1 key)");
+        println!("Debug UI: Spawn rate set to SLOW (0.5x) - Key 1");
     }
     if keyboard_input.just_pressed(KeyCode::Digit2) {
         ui_state.enemy_spawn_rate = 1.0; // Normal
         ui_state.set_changed();
-        println!("Keyboard shortcut: Spawn rate set to NORMAL (2 key)");
+        println!("Debug UI: Spawn rate set to NORMAL (1.0x) - Key 2");
     }
     if keyboard_input.just_pressed(KeyCode::Digit3) {
         ui_state.enemy_spawn_rate = 2.0; // Fast
         ui_state.set_changed();
-        println!("Keyboard shortcut: Spawn rate set to FAST (3 key)");
+        println!("Debug UI: Spawn rate set to FAST (2.0x) - Key 3");
     }
     if keyboard_input.just_pressed(KeyCode::Digit4) {
         ui_state.enemy_spawn_rate = 3.0; // Very Fast
         ui_state.set_changed();
-        println!("Keyboard shortcut: Spawn rate set to VERY FAST (4 key)");
+        println!("Debug UI: Spawn rate set to VERY FAST (3.0x) - Key 4");
     }
     if keyboard_input.just_pressed(KeyCode::Digit5) {
         ui_state.enemy_spawn_rate = 5.0; // Ultra Fast
         ui_state.set_changed();
-        println!("Keyboard shortcut: Spawn rate set to ULTRA FAST (5 key)");
+        println!("Debug UI: Spawn rate set to ULTRA FAST (5.0x) - Key 5");
     }
     
     // Plus/Minus keys - Adjust tower damage multiplier
