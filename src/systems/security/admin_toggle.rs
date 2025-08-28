@@ -8,7 +8,7 @@ pub fn admin_toggle_system(
     keyboard_input: Res<ButtonInput<KeyCode>>,
     mut security_context: ResMut<SecurityContext>,
     mut feature_flags: ResMut<DebugFeatureFlags>,
-    mut settings: ResMut<GameSettings>,
+    mut settings: Option<ResMut<GameSettings>>,
 ) {
     // Only process in development builds for security
     if !security_context.development_build {
@@ -24,7 +24,14 @@ pub fn admin_toggle_system(
             security_context.authorize_debug_access(); // Ensure debug access first
             security_context.authorize_admin_privileges();
             feature_flags.enable_admin_features();
-            settings.debug_admin_enabled = true;
+            
+            // Save to settings if available
+            if let Some(ref mut settings) = settings {
+                settings.debug_admin_enabled = true;
+                info!("💾 Admin preference saved to settings.json");
+            } else {
+                info!("⚠️ Settings not available - admin state not persisted");
+            }
             
             info!("🔑 Admin privileges ENABLED - Full F-key access granted (` to toggle)");
             info!("   F1: Debug Visualization | F2: Debug UI | F3: Grid Mode | F4: Grid Borders");
@@ -33,14 +40,18 @@ pub fn admin_toggle_system(
             // Revoke admin privileges but keep debug access
             security_context.admin_privileges = false;
             feature_flags.cheat_menu_enabled = false;
-            settings.debug_admin_enabled = false;
+            
+            // Save to settings if available
+            if let Some(ref mut settings) = settings {
+                settings.debug_admin_enabled = false;
+                info!("💾 Admin preference saved to settings.json");
+            } else {
+                info!("⚠️ Settings not available - admin state not persisted");
+            }
             
             info!("🔒 Admin privileges DISABLED - Cheat menu (F9) locked (` to toggle)");
             info!("   F1-F4 and debug features still available");
         }
-        
-        // Trigger settings save
-        info!("💾 Admin preference saved to settings.json");
     }
 }
 
