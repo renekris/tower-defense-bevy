@@ -86,11 +86,23 @@ impl InputHandler for F1DebugVisualizationHandler {
 /// F2 Key Handler - Debug UI Panel Toggle
 /// 
 /// Toggles the debug UI panel visibility for development tools
+/// Requires debug features to be enabled via backtick (`) toggle
 pub struct F2DebugUIHandler;
 
 impl InputHandler for F2DebugUIHandler {
     fn handle_input(&self, world: &mut World, key: KeyCode) -> bool {
         if key != KeyCode::F2 {
+            return false;
+        }
+        
+        // Check if debug features are enabled
+        if let Some(debug_toggle) = world.get_resource::<crate::systems::debug_toggle::DebugToggle>() {
+            if !debug_toggle.is_enabled() {
+                info!("F2 (Debug UI) blocked - Press ` (backtick) to enable debug features");
+                return true; // Consume the input to prevent fallthrough
+            }
+        } else {
+            warn!("F2 handler: DebugToggle resource not found");
             return false;
         }
         
@@ -245,11 +257,23 @@ impl InputHandler for F4GridBorderHandler {
 /// F9 Key Handler - Cheat Menu Toggle
 /// 
 /// Toggles the cheat menu visibility for development and testing
+/// Requires debug features to be enabled via backtick (`) toggle
 pub struct F9CheatMenuHandler;
 
 impl InputHandler for F9CheatMenuHandler {
     fn handle_input(&self, world: &mut World, key: KeyCode) -> bool {
         if key != KeyCode::F9 {
+            return false;
+        }
+        
+        // Check if debug features are enabled
+        if let Some(debug_toggle) = world.get_resource::<crate::systems::debug_toggle::DebugToggle>() {
+            if !debug_toggle.is_enabled() {
+                info!("F9 (Cheat Menu) blocked - Press ` (backtick) to enable debug features");
+                return true; // Consume the input to prevent fallthrough
+            }
+        } else {
+            warn!("F9 handler: DebugToggle resource not found");
             return false;
         }
         

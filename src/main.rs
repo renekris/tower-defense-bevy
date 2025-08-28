@@ -46,7 +46,8 @@ use systems::obstacle_rendering::ObstacleRenderingPlugin;
 use systems::tower_rendering::TowerRenderingPlugin;
 use systems::path_generation::generate_level_path;
 use systems::pause_system::{PauseSystemPlugin, pause_toggle_system};
-use systems::settings_menu::SettingsSystemPlugin;
+use systems::settings_menu::{SettingsSystemPlugin, GameSettings};
+use systems::debug_toggle::DebugTogglePlugin;
 
 fn main() {
     App::new()
@@ -61,9 +62,11 @@ fn main() {
         }))
         // Add BRP Extras plugin (includes RemotePlugin for MCP server integration)
         .add_plugins(BrpExtrasPlugin)
-        // Add custom plugins (ORDER MATTERS: SettingsSystemPlugin must come before SecurityPlugin)
+        // Insert GameSettings resource early to ensure availability for debug systems
+        .insert_resource(GameSettings::load())
+        // Add custom plugins (ORDER MATTERS: SettingsSystemPlugin must come before DebugTogglePlugin)
         .add_plugins(SettingsSystemPlugin) // Must be first - loads GameSettings resource
-        .add_plugins(tower_defense_bevy::systems::security::SecurityPlugin) // Security and authorization
+        .add_plugins(DebugTogglePlugin) // Simple debug feature toggle
         .add_plugins(InputRegistryPlugin::default()) // Centralized input handling
         .add_plugins(DebugUIPlugin)
         .add_plugins(ObstacleRenderingPlugin)
