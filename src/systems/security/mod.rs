@@ -4,10 +4,12 @@
 pub mod context;
 pub mod features;
 pub mod validation;
+pub mod admin_toggle;
 
 pub use context::*;
 pub use features::*;
 pub use validation::*;
+pub use admin_toggle::*;
 
 use bevy::prelude::*;
 
@@ -19,11 +21,17 @@ impl Plugin for SecurityPlugin {
         // Initialize security resources with secure defaults
         app.init_resource::<SecurityContext>()
            .init_resource::<DebugFeatureFlags>()
-           .add_systems(Startup, initialize_security_context)
-           .add_systems(Update, validate_security_context);
+           .add_systems(Startup, (initialize_security_context, initialize_admin_from_settings).chain())
+           .add_systems(Update, (
+               validate_security_context,
+               admin_toggle_system,
+               admin_status_display_system,
+           ));
 
         // Log security initialization
         info!("Security system initialized with secure defaults");
+        info!("💡 Press ` (backtick) in development builds to toggle admin mode");
+        info!("💡 Press F12 to check debug status and available F-keys");
     }
 }
 

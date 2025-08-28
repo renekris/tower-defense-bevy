@@ -151,6 +151,7 @@ pub struct GameSettings {
     pub master_volume: f32,
     pub sfx_volume: f32,
     pub music_volume: f32,
+    pub debug_admin_enabled: bool,
 }
 
 impl Default for GameSettings {
@@ -162,6 +163,7 @@ impl Default for GameSettings {
             master_volume: 1.0,
             sfx_volume: 0.8,
             music_volume: 0.6,
+            debug_admin_enabled: false, // Secure default
         }
     }
 }
