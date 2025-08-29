@@ -367,30 +367,45 @@ fn mark_strategic_area(_grid: &mut PathGrid, _center: GridPos) {
     // This would help optimize placement zones around important chokepoints
 }
 
-/// Calculate the strategic value of a position based on nearby obstacles and chokepoints
+/// Calculate the strategic value of a position based on nearby obstacles, chokepoints, and smooth path curves
+/// Enhanced to work with Catmull-Rom splined paths for optimal tower placement
 pub fn calculate_strategic_value(grid: &PathGrid, pos: GridPos, path: &[GridPos]) -> f32 {
     let mut value = 0.0;
     
-    // Higher value for positions near the path
+    // Enhanced path proximity scoring - considers curved path segments
     let min_path_distance = path.iter()
         .map(|&path_pos| pos.manhattan_distance(&path_pos))
         .fold(f32::INFINITY, f32::min);
     
-    if min_path_distance <= 3.0 {
-        value += (4.0 - min_path_distance) * 0.25; // Up to 1.0 points for being close to path
+    if min_path_distance <= 4.0 {
+        // Exponential dropoff for proximity - closer positions are much more valuable
+        let proximity_score = ((5.0 - min_path_distance) / 5.0).powf(2.0);
+        value += proximity_score * 0.4; // Up to 0.4 points for being close to path
     }
     
-    // Higher value for positions near chokepoints  
+    // Chokepoint detection - areas with limited escape routes
     let empty_neighbors = grid.count_empty_neighbors(pos);
-    if empty_neighbors <= 4 {
-        value += (4 - empty_neighbors) as f32 * 0.1; // Up to 0.4 points for being in tight areas
+    if empty_neighbors <= 5 {
+        value += (5 - empty_neighbors) as f32 * 0.08; // Up to 0.4 points for being in tight areas
     }
     
-    // Higher value for positions with good coverage of the path
-    let path_coverage = calculate_path_coverage(grid, pos, path);
-    value += path_coverage * 0.5; // Up to 0.5 points for good path coverage
+    // Enhanced path coverage considering smooth curves
+    let path_coverage = calculate_enhanced_path_coverage(grid, pos, path);
+    value += path_coverage * 0.6; // Up to 0.6 points for good path coverage
     
-    value.min(2.0) // Cap at 2.0 maximum strategic value
+    // Strategic curve position bonus - corners and bends are premium positions
+    let curve_bonus = calculate_curve_position_bonus(pos, path);
+    value += curve_bonus * 0.3; // Up to 0.3 points for curve positions
+    
+    // Multi-segment coverage bonus - positions that can hit multiple path sections
+    let multi_segment_bonus = calculate_multi_segment_coverage(pos, path);
+    value += multi_segment_bonus * 0.25; // Up to 0.25 points for multi-segment coverage
+    
+    // Distance from edges bonus - central positions are more flexible
+    let center_bonus = calculate_center_position_bonus(grid, pos);
+    value += center_bonus * 0.15; // Up to 0.15 points for central positioning
+    
+    value.min(2.5) // Increased cap for better strategic differentiation
 }
 
 /// Calculate how much of the path this position can "see" or cover
@@ -402,6 +417,125 @@ fn calculate_path_coverage(_grid: &PathGrid, pos: GridPos, path: &[GridPos]) -> 
         .count();
     
     (covered_path_segments as f32 / path.len() as f32).min(1.0)
+}
+
+/// Enhanced path coverage calculation that considers smooth curve segments
+/// Evaluates how effectively a position can control the curved path flow
+fn calculate_enhanced_path_coverage(_grid: &PathGrid, pos: GridPos, path: &[GridPos]) -> f32 {
+    let max_range = 4.5; // Slightly increased range for curve considerations
+    let mut total_coverage = 0.0;
+    let mut total_weight = 0.0;
+    
+    for (i, &path_pos) in path.iter().enumerate() {
+        let distance = pos.manhattan_distance(&path_pos);
+        if distance <= max_range {
+            // Weight coverage by distance (closer = better) and path position importance
+            let distance_weight = (max_range - distance) / max_range;
+            
+            // Strategic positions in the middle of the path are more valuable
+            let path_progress = i as f32 / (path.len() - 1) as f32;
+            let position_weight = if path_progress < 0.2 || path_progress > 0.8 {
+                0.7 // Start/end positions are less critical
+            } else {
+                1.0 // Middle positions are prime
+            };
+            
+            let weight = distance_weight * position_weight;
+            total_coverage += weight;
+            total_weight += 1.0;
+        }
+    }
+    
+    if total_weight > 0.0 {
+        (total_coverage / total_weight).min(1.0)
+    } else {
+        0.0
+    }
+}
+
+/// Calculate bonus for positions near path curves and bends
+/// Curved sections provide natural chokepoints and strategic opportunities
+fn calculate_curve_position_bonus(pos: GridPos, path: &[GridPos]) -> f32 {
+    if path.len() < 3 {
+        return 0.0;
+    }
+    
+    let mut max_curve_bonus: f32 = 0.0;
+    
+    // Analyze path segments for curvature
+    for i in 1..path.len() - 1 {
+        let prev = path[i - 1];
+        let curr = path[i];
+        let next = path[i + 1];
+        
+        // Calculate direction change (higher = more curved)
+        let dir1 = (curr.x as i32 - prev.x as i32, curr.y as i32 - prev.y as i32);
+        let dir2 = (next.x as i32 - curr.x as i32, next.y as i32 - curr.y as i32);
+        
+        // Detect significant direction changes (curves)
+        let is_curve = dir1.0 != dir2.0 || dir1.1 != dir2.1;
+        if is_curve {
+            let distance_to_curve = pos.manhattan_distance(&curr);
+            if distance_to_curve <= 3.0 {
+                // Closer to curve = higher bonus
+                let curve_bonus = (3.0 - distance_to_curve) / 3.0;
+                max_curve_bonus = max_curve_bonus.max(curve_bonus);
+            }
+        }
+    }
+    
+    max_curve_bonus
+}
+
+/// Calculate bonus for positions that can cover multiple path segments
+/// Positions that control multiple sections of the path are strategically superior
+fn calculate_multi_segment_coverage(pos: GridPos, path: &[GridPos]) -> f32 {
+    let max_range = 4.0;
+    let segment_size = 3; // Group path points into segments
+    let mut covered_segments = 0;
+    
+    // Divide path into segments and check coverage
+    for segment_start in (0..path.len()).step_by(segment_size) {
+        let segment_end = (segment_start + segment_size).min(path.len());
+        let segment = &path[segment_start..segment_end];
+        
+        // Check if this position covers any point in this segment
+        let covers_segment = segment.iter().any(|&path_pos| {
+            pos.manhattan_distance(&path_pos) <= max_range
+        });
+        
+        if covers_segment {
+            covered_segments += 1;
+        }
+    }
+    
+    let total_segments = (path.len() + segment_size - 1) / segment_size; // Ceiling division
+    if total_segments > 1 {
+        // Bonus for covering multiple segments
+        let coverage_ratio = covered_segments as f32 / total_segments as f32;
+        if coverage_ratio > 0.5 {
+            // Significant multi-segment coverage gets a bonus
+            (coverage_ratio - 0.5) * 2.0 // Scale to 0.0-1.0 range
+        } else {
+            0.0
+        }
+    } else {
+        0.0
+    }
+}
+
+/// Calculate bonus for central positions away from map edges
+/// Central positions provide more flexible tower placement and defensive options
+fn calculate_center_position_bonus(grid: &PathGrid, pos: GridPos) -> f32 {
+    let center_x = grid.width as f32 / 2.0;
+    let center_y = grid.height as f32 / 2.0;
+    
+    let distance_from_center = ((pos.x as f32 - center_x).powf(2.0) + (pos.y as f32 - center_y).powf(2.0)).sqrt();
+    let max_distance = ((center_x).powf(2.0) + (center_y).powf(2.0)).sqrt();
+    
+    // Positions closer to center get higher bonus
+    let center_ratio = (max_distance - distance_from_center) / max_distance;
+    center_ratio.max(0.0).min(1.0)
 }
 
 /// Generate a random path with strategic obstacles and A* pathfinding
@@ -627,8 +761,9 @@ fn generate_vertical_waypoints(start: GridPos, end: GridPos, grid: &PathGrid) ->
     ]
 }
 
-/// Generate adaptive waypoints based on start/end positions
+/// Generate adaptive waypoints based on start/end positions with enhanced strategic chokepoint creation
 /// Creates strategic paths that work regardless of which sides the points are on
+/// Focus on creating natural chokepoints where towers will be most effective
 fn generate_adaptive_waypoints(
     rng: &mut StdRng,
     start: GridPos,
@@ -643,7 +778,7 @@ fn generate_adaptive_waypoints(
     let dx = end.x as i32 - start.x as i32;
     let dy = end.y as i32 - start.y as i32;
     
-    // Create waypoints that force the path to take detours
+    // Enhanced strategic waypoint placement for better chokepoints
     for i in 1..=num_turns {
         let progress = i as f32 / (num_turns + 1) as f32; // 0.0 to 1.0
         
@@ -651,32 +786,70 @@ fn generate_adaptive_waypoints(
         let base_x = start.x as f32 + dx as f32 * progress;
         let base_y = start.y as f32 + dy as f32 * progress;
         
-        // Add strategic detours based on position along the path
-        let (detour_x, detour_y) = if i % 2 == 1 {
-            // Odd waypoints: detour perpendicular to main direction
-            if dx.abs() > dy.abs() {
-                // Horizontal travel - detour vertically
-                let detour_magnitude = rng.random_range(5..12);
-                let detour_direction = if rng.random() { 1 } else { -1 };
-                (0, detour_direction * detour_magnitude)
-            } else {
-                // Vertical travel - detour horizontally
-                let detour_magnitude = rng.random_range(6..15);
-                let detour_direction = if rng.random() { 1 } else { -1 };
-                (detour_direction * detour_magnitude, 0)
+        // Create strategic detours that form natural chokepoints
+        let (detour_x, detour_y) = match i % 3 {
+            0 => {
+                // Create narrow passages - force path through center corridor
+                let corridor_width = 6; // Narrow corridor
+                let center_y = height / 2;
+                let target_y = center_y as i32 + rng.random_range(-2..=2);
+                (0, target_y - base_y as i32)
+            },
+            1 => {
+                // Create defensive positions - detour perpendicular to main direction
+                if dx.abs() > dy.abs() {
+                    // Horizontal travel - create vertical chokepoint
+                    let detour_magnitude = rng.random_range(8..16); // Bigger detours for better chokepoints
+                    let detour_direction = if progress < 0.5 { 
+                        // First half: detour up/down based on start position
+                        if start.y > height / 2 { -1 } else { 1 }
+                    } else { 
+                        // Second half: opposite direction for S-curve
+                        if start.y > height / 2 { 1 } else { -1 }
+                    };
+                    (0, detour_direction * detour_magnitude)
+                } else {
+                    // Vertical travel - create horizontal chokepoint
+                    let detour_magnitude = rng.random_range(10..18);
+                    let detour_direction = if progress < 0.5 {
+                        if start.x > width / 2 { -1 } else { 1 }
+                    } else {
+                        if start.x > width / 2 { 1 } else { -1 }
+                    };
+                    (detour_direction * detour_magnitude, 0)
+                }
+            },
+            _ => {
+                // Strategic positioning - create zones for tower placement
+                let center_x = width as i32 / 2;
+                let center_y = height as i32 / 2;
+                
+                // Bias toward creating clear tower zones
+                let zone_offset_x = if (base_x as i32) < center_x { 
+                    // Left side of map - push path toward center-left
+                    rng.random_range(3..8)
+                } else {
+                    // Right side of map - push path toward center-right  
+                    rng.random_range(-8..-3)
+                };
+                
+                let zone_offset_y = if (base_y as i32) < center_y {
+                    rng.random_range(2..6)
+                } else {
+                    rng.random_range(-6..-2)
+                };
+                
+                (zone_offset_x, zone_offset_y)
             }
-        } else {
-            // Even waypoints: smaller corrections toward center
-            let center_x = width as i32 / 2;
-            let center_y = height as i32 / 2;
-            let to_center_x = (center_x - base_x as i32) / 3;
-            let to_center_y = (center_y - base_y as i32) / 3;
-            (to_center_x, to_center_y)
         };
         
-        // Apply detours with bounds checking
-        let final_x = ((base_x as i32 + detour_x).max(2).min(width as i32 - 3)) as usize;
-        let final_y = ((base_y as i32 + detour_y).max(2).min(height as i32 - 3)) as usize;
+        // Apply detours with bounds checking, ensuring we stay away from edges
+        let min_border = 3; // Keep waypoints away from edges for better tower placement
+        let max_x = (width as i32 - min_border).max(min_border);
+        let max_y = (height as i32 - min_border).max(min_border);
+        
+        let final_x = ((base_x as i32 + detour_x).max(min_border).min(max_x)) as usize;
+        let final_y = ((base_y as i32 + detour_y).max(min_border).min(max_y)) as usize;
         
         waypoints.push(GridPos::new(final_x, final_y));
     }

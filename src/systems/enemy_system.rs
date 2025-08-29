@@ -19,8 +19,8 @@ pub fn enemy_spawning_system(
 
     // Check if we should spawn an enemy
     if wave_manager.should_spawn_enemy() {
-        // Get the starting position from the path
-        let start_pos = enemy_path.get_position_at_progress(0.0);
+        // Get the starting position from the path using smooth interpolation
+        let start_pos = enemy_path.get_smooth_position_at_progress(0.0);
 
         // Spawn a new enemy entity with wave-scaled stats for proper difficulty progression
         let current_wave = wave_manager.current_wave;
@@ -59,8 +59,8 @@ pub fn enemy_movement_system(
         // Advance the enemy's progress
         path_progress.advance(progress_this_frame);
         
-        // Update the enemy's position based on current progress
-        let new_position = enemy_path.get_position_at_progress(path_progress.current);
+        // Update the enemy's position based on current progress using smooth spline interpolation
+        let new_position = enemy_path.get_smooth_position_at_progress(path_progress.current);
         transform.translation = new_position.extend(0.0);
     }
 }
